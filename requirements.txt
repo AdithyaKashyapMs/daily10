@@ -1,0 +1,24 @@
+# API
+fastapi==0.139.0
+uvicorn[standard]
+python-multipart
+pydantic>=2
+sqlalchemy>=2.0
+python-dotenv
+requests
+
+# LLM (Groq) and text processing
+langchain-core
+langchain-groq
+langchain-text-splitters
+
+# Reading notes and exam papers
+pypdf
+pdfplumber
+python-docx
+python-pptx
+beautifulsoup4
+
+# Tests
+pytest
+httpx

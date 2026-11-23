@@ -1,0 +1,1281 @@
+{
+ "date": "2026-11-23",
+ "judge_model": "qwen/qwen3.8-27b",
+ "generator_model": "openai/gpt-oss-120b",
+ "questions": [
+  {
+   "id": 1,
+   "topic_id": 1,
+   "topic": "Kubernetes Core Architecture Overview",
+   "prompt": "What is the primary role of the master in a Kubernetes cluster?",
+   "options": [
+    "Run user applications",
+    "Store container images",
+    "Act as the primary control plane",
+    "Provide network routing"
+   ],
+   "answer_index": 2,
+   "evidence": "Masters - Acts as the primary control plane for Kubernetes.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 2,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 2,
+   "topic_id": 1,
+   "topic": "Kubernetes Core Architecture Overview",
+   "prompt": "Which component provides the REST interface to the Kubernetes control plane?",
+   "options": [
+    "etcd",
+    "kube-scheduler",
+    "kube-apiserver",
+    "cloud-controller-manager"
+   ],
+   "answer_index": 2,
+   "evidence": "kube-apiserver ... provides a forward facing REST interface into the kubernetes control plane and datastore.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 2,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 3,
+   "topic_id": 1,
+   "topic": "Kubernetes Core Architecture Overview",
+   "prompt": "What is the function of etcd in Kubernetes?",
+   "options": [
+    "Schedule pods",
+    "Store cluster state",
+    "Manage network policies",
+    "Run containers"
+   ],
+   "answer_index": 1,
+   "evidence": "etcd acts as the cluster datastore; providing a strong, consistent and highly available key-value store used for persisting cluster state.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 4,
+   "topic_id": 1,
+   "topic": "Kubernetes Core Architecture Overview",
+   "prompt": "Which component evaluates workload requirements to place pods on suitable nodes?",
+   "options": [
+    "kube-controller-manager",
+    "kube-scheduler",
+    "kubelet",
+    "kube-proxy"
+   ],
+   "answer_index": 1,
+   "evidence": "Kube-scheduler ... evaluates workload requirements and attempts to place it on a matching resource.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 5,
+   "topic_id": 1,
+   "topic": "Kubernetes Core Architecture Overview",
+   "prompt": "Which of the following is NOT a node component listed in the notes?",
+   "options": [
+    "Kubelet",
+    "Kube-proxy",
+    "Container runtime engine",
+    "Kube-apiserver"
+   ],
+   "answer_index": 3,
+   "evidence": "Node Components\nKubelet\nKube-proxy\nContainer runtime engine",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 3,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 6,
+   "topic_id": 1,
+   "topic": "Kubernetes Core Architecture Overview",
+   "prompt": "According to the notes, Kubernetes is described as the \"linux kernel of distributed systems\" because it:",
+   "options": [
+    "Manages hardware drivers",
+    "Abstracts underlying hardware and provides a uniform interface",
+    "Provides a file system for containers",
+    "Runs only on Linux"
+   ],
+   "answer_index": 1,
+   "evidence": "Kubernetes is the linux kernel of distributed systems. It abstracts away the underlying hardware of the nodes and provides a uniform interface for applications to be both deployed and consume the shared pool of resources.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 7,
+   "topic_id": 2,
+   "topic": "Kubernetes Node Components & Networking",
+   "prompt": "Which node component is responsible for managing pod lifecycle on its host?",
+   "options": [
+    "kube-proxy",
+    "kubelet",
+    "container runtime",
+    "kube-dns"
+   ],
+   "answer_index": 1,
+   "evidence": "kubelet Acts as the node agent responsible for managing pod lifecycle on its host.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 8,
+   "topic_id": 2,
+   "topic": "Kubernetes Node Components & Networking",
+   "prompt": "Which proxy mode was introduced as alpha in Kubernetes 1.8?",
+   "options": [
+    "userspace",
+    "iptables",
+    "ipvs",
+    "CNI"
+   ],
+   "answer_index": 2,
+   "evidence": "ipvs (alpha in 1.8)",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 2,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 9,
+   "topic_id": 2,
+   "topic": "Kubernetes Node Components & Networking",
+   "prompt": "How do pods communicate with each other according to Kubernetes networking fundamentals?",
+   "options": [
+    "Through NAT translation",
+    "Via node\u2011level proxy only",
+    "Directly without NAT",
+    "Through an external load balancer"
+   ],
+   "answer_index": 2,
+   "evidence": "All Pods can communicate with all other Pods without NAT",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 2,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 10,
+   "topic_id": 2,
+   "topic": "Kubernetes Node Components & Networking",
+   "prompt": "What characteristic distinguishes a Service IP from a Pod IP?",
+   "options": [
+    "It changes whenever a pod restarts",
+    "It persists across the pod lifecycle",
+    "It is assigned per node",
+    "It is only used for external traffic"
+   ],
+   "answer_index": 1,
+   "evidence": "Services are given a persistent cluster unique IP that spans the Pods lifecycle.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 11,
+   "topic_id": 2,
+   "topic": "Kubernetes Node Components & Networking",
+   "prompt": "Which of the following is NOT listed as a compatible CNI network plugin?",
+   "options": [
+    "Calico",
+    "Flannel",
+    "Istio",
+    "Weave"
+   ],
+   "answer_index": 2,
+   "evidence": "Compatible CNI Network Plugins: ... Calico ... Flannel ... Weave ...",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 2,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 12,
+   "topic_id": 2,
+   "topic": "Kubernetes Node Components & Networking",
+   "prompt": "What is a key difference between labels and annotations?",
+   "options": [
+    "Labels are non\u2011identifying metadata, annotations are used for selection",
+    "Labels have strict syntax, annotations have no such limits",
+    "Labels configure networking, annotations configure storage",
+    "Labels apply only to nodes, annotations only to pods"
+   ],
+   "answer_index": 1,
+   "evidence": "Labels have a strict syntax and available character set. Annotations do not have the the syntax limitations as labels",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 13,
+   "topic_id": 3,
+   "topic": "Kubernetes Workload & Service Basics",
+   "prompt": "Which controller is responsible for ensuring a specified number of pod replicas are running and can be scaled?",
+   "options": [
+    "Deployment",
+    "ReplicaSet",
+    "Job",
+    "DaemonSet"
+   ],
+   "answer_index": 1,
+   "evidence": "ReplicaSet - Next Generation ReplicationController. Supports set-based selectors.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": true,
+    "answerable_from_notes": true,
+    "clear": false,
+    "note": "The notes define ReplicaSet as the 'Next Generation ReplicationController' which manages pod replicas, while Deployment is described as managing 'stateless Pods and ReplicaSets', making both options defensible depending on whether the question implies the direct controller or the high-level declarative method."
+   },
+   "judge_correct": false
+  },
+  {
+   "id": 14,
+   "topic_id": 3,
+   "topic": "Kubernetes Workload & Service Basics",
+   "prompt": "Which workload type is designed for pods that require stable network identities and persistent storage?",
+   "options": [
+    "Deployment",
+    "StatefulSet",
+    "DaemonSet",
+    "Job"
+   ],
+   "answer_index": 1,
+   "evidence": "StatefulSet - A controller tailored to managing Pods that must persist or maintain state. Pod identity including hostname, network, and storage will be persisted.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 15,
+   "topic_id": 3,
+   "topic": "Kubernetes Workload & Service Basics",
+   "prompt": "Which service type exposes a service on each node\u2019s IP on a statically defined port?",
+   "options": [
+    "ClusterIP",
+    "NodePort",
+    "LoadBalancer",
+    "ExternalName"
+   ],
+   "answer_index": 1,
+   "evidence": "NodePort - Service is exposed on each node\u2019s IP on a statically defined port.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 16,
+   "topic_id": 3,
+   "topic": "Kubernetes Workload & Service Basics",
+   "prompt": "Which controller runs a pod on every node that matches its node selector, bypassing the default scheduler?",
+   "options": [
+    "Deployment",
+    "DaemonSet",
+    "Job",
+    "ReplicaSet"
+   ],
+   "answer_index": 1,
+   "evidence": "DaemonSet - Ensures that all nodes matching certain criteria will run an instance of a supplied Pod.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 17,
+   "topic_id": 3,
+   "topic": "Kubernetes Workload & Service Basics",
+   "prompt": "Which controller ensures that a job runs until it meets its completion or parallelism criteria?",
+   "options": [
+    "CronJob",
+    "Deployment",
+    "Job",
+    "DaemonSet"
+   ],
+   "answer_index": 2,
+   "evidence": "Job - The job controller ensures one or more pods are executed and successfully terminates. It will do this until it satisfies the completion and/or parallelism condition.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 2,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 18,
+   "topic_id": 3,
+   "topic": "Kubernetes Workload & Service Basics",
+   "prompt": "Which service type is used to reference an external DNS name from within the cluster?",
+   "options": [
+    "ClusterIP",
+    "NodePort",
+    "LoadBalancer",
+    "ExternalName"
+   ],
+   "answer_index": 3,
+   "evidence": "ExternalName - used to references endpoints OUTSIDE the cluster by providing a static internally referenced DNS name.",
+   "status": "approved",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 3,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 19,
+   "topic_id": 4,
+   "topic": "Kubernetes Core Concepts Overview",
+   "prompt": "Which Kubernetes object is deployed as a pod and handles external traffic routing?",
+   "options": [
+    "Ingress Controller",
+    "ConfigMap",
+    "ServiceAccount",
+    "PersistentVolume"
+   ],
+   "answer_index": 0,
+   "evidence": "Deployed as a pod to one or more hosts",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 0,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 20,
+   "topic_id": 4,
+   "topic": "Kubernetes Core Concepts Overview",
+   "prompt": "Which storage object represents a request for storage rather than a concrete storage resource?",
+   "options": [
+    "PersistentVolume",
+    "Volume",
+    "PersistentVolumeClaim",
+    "StorageClass"
+   ],
+   "answer_index": 2,
+   "evidence": "PersistentVolumeClaim - A PersistentVolumeClaim (PVC) is a request for storage that satisfies a set of requirements instead of mapping to a storage resource directly.",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 2,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 21,
+   "topic_id": 4,
+   "topic": "Kubernetes Core Concepts Overview",
+   "prompt": "Which of the following is a cluster\u2011wide resource, not limited to a namespace?",
+   "options": [
+    "PersistentVolumeClaim",
+    "ConfigMap",
+    "ServiceAccount",
+    "PersistentVolume"
+   ],
+   "answer_index": 3,
+   "evidence": "PVs are a cluster-wide resource",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 3,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 22,
+   "topic_id": 4,
+   "topic": "Kubernetes Core Concepts Overview",
+   "prompt": "What is the primary difference between a ConfigMap and a Secret?",
+   "options": [
+    "ConfigMaps are encrypted at rest, Secrets are not",
+    "Secrets are stored encoded as base64 and can be encrypted at rest",
+    "ConfigMaps can only be used as environment variables",
+    "Secrets cannot be mounted as files"
+   ],
+   "answer_index": 1,
+   "evidence": "Secret - Functionally identical to ConfigMaps, but stored encoded as base64, and encrypted at  rest (if configured).",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 23,
+   "topic_id": 4,
+   "topic": "Kubernetes Core Concepts Overview",
+   "prompt": "In RBAC, which object binds permissions to users, groups, or service accounts?",
+   "options": [
+    "Role",
+    "RoleBinding",
+    "ServiceAccount",
+    "StorageClass"
+   ],
+   "answer_index": 1,
+   "evidence": "[Cluster]RoleBinding - Grant the permissions as defined in a [Cluster]Role to one or more \u201csubjects\u201d which can be a user, group, or service account.",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 24,
+   "topic_id": 4,
+   "topic": "Kubernetes Core Concepts Overview",
+   "prompt": "Which field determines how a PersistentVolume can be accessed?",
+   "options": [
+    "capacity",
+    "accessModes",
+    "reclaimPolicy",
+    "provisioner"
+   ],
+   "answer_index": 1,
+   "evidence": "PV Parameters: Capacity accessModes ReadOnlyMany (ROX) ReadWriteOnce (RWO) ReadWriteMany (RWX)",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 25,
+   "topic_id": 5,
+   "topic": "Kubernetes Deployment Lifecycle Overview",
+   "prompt": "What does kubectl do before sending a manifest to the apiserver?",
+   "options": [
+    "Validates the manifest client\u2011side",
+    "Stores the manifest in etcd",
+    "Schedules the pod",
+    "Creates a pause container"
+   ],
+   "answer_index": 0,
+   "evidence": "Kubectl performs client side validation on manifest (linting).",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 0,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 26,
+   "topic_id": 5,
+   "topic": "Kubernetes Deployment Lifecycle Overview",
+   "prompt": "Which component assigns a node to a pod that has no NodeName?",
+   "options": [
+    "Deployment Controller",
+    "Scheduler",
+    "Kubelet",
+    "ReplicaSet Controller"
+   ],
+   "answer_index": 1,
+   "evidence": "Scheduler monitors published pods with no \u2018NodeName\u2019 assigned.",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 27,
+   "topic_id": 5,
+   "topic": "Kubernetes Deployment Lifecycle Overview",
+   "prompt": "How does the Scheduler communicate a pod\u2011to\u2011node binding?",
+   "options": [
+    "Direct RPC to the node",
+    "POST to the apiserver",
+    "Write directly to etcd",
+    "Update via kubelet"
+   ],
+   "answer_index": 1,
+   "evidence": "Scheduler creates a binding of Pod to Node and POSTs to apiserver.",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 28,
+   "topic_id": 5,
+   "topic": "Kubernetes Deployment Lifecycle Overview",
+   "prompt": "What is the purpose of the pause container in a pod?",
+   "options": [
+    "Runs the user application",
+    "Acts as the parent container for the pod",
+    "Provides the pod\u2019s IP address",
+    "Stores secret data"
+   ],
+   "answer_index": 1,
+   "evidence": "Kubelet then provisions a \u2018pause\u2019 container via the CRI. The pause container acts as the parent container for the Pod.",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 29,
+   "topic_id": 5,
+   "topic": "Kubernetes Deployment Lifecycle Overview",
+   "prompt": "In what order does kubelet start containers inside a pod?",
+   "options": [
+    "Primary containers first, then init containers",
+    "Init containers first, then primary containers",
+    "All containers start simultaneously",
+    "Only primary containers are started"
+   ],
+   "answer_index": 1,
+   "evidence": "Kubelet first creates and starts any init containers. Once the optional init containers complete, the primary pod containers are started.",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 30,
+   "topic_id": 5,
+   "topic": "Kubernetes Deployment Lifecycle Overview",
+   "prompt": "When is a pod's status set to Ready?",
+   "options": [
+    "After the container image is pulled",
+    "After the network is plumbed",
+    "After liveless/readiness probes succeed",
+    "After the pause container is created"
+   ],
+   "answer_index": 2,
+   "evidence": "If there are any liveless/readiness probes, these are executed before the PodStatus is updated. If all complete successfully, PodStatus is set to ready.",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 2,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 31,
+   "topic_id": 6,
+   "topic": "Kubernetes Jobs & CronJobs Overview",
+   "prompt": "What is the purpose of a Kubernetes Job?",
+   "options": [
+    "Run long\u2011running services",
+    "Run finite workloads to completion",
+    "Schedule periodic tasks",
+    "Manage stateful sets"
+   ],
+   "answer_index": 1,
+   "evidence": "A Kubernetes Job is a resource designed to run finite workloads that execute a task to completion.",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 32,
+   "topic_id": 6,
+   "topic": "Kubernetes Jobs & CronJobs Overview",
+   "prompt": "Which restartPolicy is NOT allowed for a Job?",
+   "options": [
+    "OnFailure",
+    "Never",
+    "Always",
+    "None"
+   ],
+   "answer_index": 2,
+   "evidence": "Always: Not allowed (would prevent Pod from ever completing).",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 2,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 33,
+   "topic_id": 6,
+   "topic": "Kubernetes Jobs & CronJobs Overview",
+   "prompt": "In which API group does a Job belong?",
+   "options": [
+    "apps/v1",
+    "batch/v1",
+    "core/v1",
+    "extensions/v1beta1"
+   ],
+   "answer_index": 1,
+   "evidence": "Belongs to the batch/v1 API group (stable).",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 34,
+   "topic_id": 6,
+   "topic": "Kubernetes Jobs & CronJobs Overview",
+   "prompt": "What happens when a Job's pod fails with restartPolicy Never?",
+   "options": [
+    "Kubelet restarts the container",
+    "Entire Pod is marked as failed and a new Pod is created",
+    "Job stops permanently",
+    "Pod restarts automatically"
+   ],
+   "answer_index": 1,
+   "evidence": "Never: Entire Pod is marked as failed, Job controller creates a new Pod.",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 35,
+   "topic_id": 6,
+   "topic": "Kubernetes Jobs & CronJobs Overview",
+   "prompt": "Which field controls the maximum number of Pods running concurrently in a Job?",
+   "options": [
+    "completions",
+    "parallelism",
+    "backoffLimit",
+    "restartPolicy"
+   ],
+   "answer_index": 1,
+   "evidence": "Parallelism Controls maximum concurrent Pods: spec: parallelism: 3",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 36,
+   "topic_id": 6,
+   "topic": "Kubernetes Jobs & CronJobs Overview",
+   "prompt": "What does completionMode: Indexed do?",
+   "options": [
+    "All Pods are identical",
+    "Each Pod gets a unique completion index",
+    "Pods run sequentially",
+    "Pods run in parallel without indexing"
+   ],
+   "answer_index": 1,
+   "evidence": "Indexed Mode Each Pod gets a unique completion index:",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 37,
+   "topic_id": 7,
+   "topic": "Kubernetes CronJob Scheduling and Configuration",
+   "prompt": "What does the cron expression \"0 9 * * 1\" schedule?",
+   "options": [
+    "Every day at 9:00 AM",
+    "Every Monday at 9:00 AM",
+    "Every hour at minute 0",
+    "Every 15 minutes"
+   ],
+   "answer_index": 1,
+   "evidence": "# Every Monday at 9:00 AM\nschedule: \"0 9 * * 1\"",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 38,
+   "topic_id": 7,
+   "topic": "Kubernetes CronJob Scheduling and Configuration",
+   "prompt": "Which shorthand expression schedules a job to run every hour?",
+   "options": [
+    "@daily",
+    "@weekly",
+    "@hourly",
+    "@monthly"
+   ],
+   "answer_index": 2,
+   "evidence": "schedule: \"@hourly\"    # Every hour",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 2,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 39,
+   "topic_id": 7,
+   "topic": "Kubernetes CronJob Scheduling and Configuration",
+   "prompt": "What is the purpose of the startingDeadlineSeconds field in a CronJob spec?",
+   "options": [
+    "It sets the maximum execution time for the job.",
+    "It defines how long to wait for a missed schedule before skipping it.",
+    "It limits the number of concurrent jobs.",
+    "It specifies the timeout for the pod startup."
+   ],
+   "answer_index": 1,
+   "evidence": "startingDeadlineSeconds: 300",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": -1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": false,
+    "clear": true,
+    "note": "The notes list the field 'startingDeadlineSeconds' in the YAML example but do not provide a definition or explanation of its purpose."
+   },
+   "judge_correct": false
+  },
+  {
+   "id": 40,
+   "topic_id": 7,
+   "topic": "Kubernetes CronJob Scheduling and Configuration",
+   "prompt": "How does the concurrencyPolicy: Forbid setting affect job execution?",
+   "options": [
+    "It allows multiple jobs to run simultaneously.",
+    "It prevents a new job from starting if the previous one is still running.",
+    "It replaces the currently running job with a new one.",
+    "It pauses the schedule until the current job finishes."
+   ],
+   "answer_index": 1,
+   "evidence": "concurrencyPolicy: Forbid",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 41,
+   "topic_id": 7,
+   "topic": "Kubernetes CronJob Scheduling and Configuration",
+   "prompt": "In the provided example, how is the DB_USER environment variable configured?",
+   "options": [
+    "Using a hardcoded string value.",
+    "Using a secretKeyRef to a secret named db-credentials.",
+    "Using a configMap reference.",
+    "Using a file mount from a volume."
+   ],
+   "answer_index": 1,
+   "evidence": "valueFrom:\n                secretKeyRef:\n                  name: db-credentials\n                  key: username",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 42,
+   "topic_id": 7,
+   "topic": "Kubernetes CronJob Scheduling and Configuration",
+   "prompt": "What does the activeDeadlineSeconds field specify in the jobTemplate spec?",
+   "options": [
+    "The time limit for the pod to start.",
+    "The maximum duration the job is allowed to run.",
+    "The interval between job executions.",
+    "The time to wait for a missed schedule."
+   ],
+   "answer_index": 1,
+   "evidence": "activeDeadlineSeconds: 3600  # 1 hour timeout",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 43,
+   "topic_id": 8,
+   "topic": "Kubernetes CronJobs: ETL, DB, ML, Monitoring",
+   "prompt": "What is the schedule for the database maintenance CronJob?",
+   "options": [
+    "Sunday at 3\u202fAM",
+    "Monday at 3\u202fAM",
+    "Sunday at 4\u202fAM",
+    "Monday at 4\u202fAM"
+   ],
+   "answer_index": 0,
+   "evidence": "schedule: \"0 3 * * 0\"  # Sundays at 3 AM",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 0,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 44,
+   "topic_id": 8,
+   "topic": "Kubernetes CronJobs: ETL, DB, ML, Monitoring",
+   "prompt": "What CPU limit is set for the ETL pipeline job?",
+   "options": [
+    "1000m",
+    "2000m",
+    "4000m",
+    "8000m"
+   ],
+   "answer_index": 1,
+   "evidence": "limits:\n                cpu: 2000m",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 45,
+   "topic_id": 8,
+   "topic": "Kubernetes CronJobs: ETL, DB, ML, Monitoring",
+   "prompt": "Which Prometheus query calculates the job success rate?",
+   "options": [
+    "rate(kube_job_status_succeeded[5m]) / rate(kube_job_status_completed[5m])",
+    "avg(kube_job_status_completion_time - kube_job_status_start_time)",
+    "increase(kube_job_status_failed[1h])",
+    "rate(kube_job_status_failed[5m]) / rate(kube_job_status_completed[5m])"
+   ],
+   "answer_index": 0,
+   "evidence": "# Prometheus query\nrate(kube_job_status_succeeded[5m]) / rate(kube_job_status_completed[5m])",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 0,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 46,
+   "topic_id": 10,
+   "topic": "Kubernetes Job Troubleshooting",
+   "prompt": "Which of the following is a common cause of a Job stuck in Pending state?",
+   "options": [
+    "Insufficient cluster resources",
+    "Node selector constraints",
+    "Pod security policies blocking creation",
+    "All of the above"
+   ],
+   "answer_index": 3,
+   "evidence": "Common Causes: Insufficient cluster resources Node selector constraints Pod security policies blocking creation",
+   "status": "draft",
+   "auto_issues": [
+    "all/none-of-the-above option"
+   ],
+   "verdict": {
+    "chosen_index": 3,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 47,
+   "topic_id": 10,
+   "topic": "Kubernetes Job Troubleshooting",
+   "prompt": "Which kubectl command is used to view events related to a Job?",
+   "options": [
+    "kubectl describe job <job-name>",
+    "kubectl get events --sort-by=.metadata.creationTimestamp",
+    "kubectl top nodes",
+    "kubectl describe nodes"
+   ],
+   "answer_index": 1,
+   "evidence": "Check events kubectl get events --sort-by=.metadata.creationTimestamp",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 48,
+   "topic_id": 10,
+   "topic": "Kubernetes Job Troubleshooting",
+   "prompt": "How should the cron expression \"60 * * * *\" be corrected?",
+   "options": [
+    "Change minute to 0-59",
+    "Remove the minute field",
+    "Use 60 as the hour",
+    "Use 0 as the minute"
+   ],
+   "answer_index": 0,
+   "evidence": "schedule: \"60 * * * *\"  # Invalid - minute must be 0-59",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 3,
+    "another_option_also_correct": true,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": false
+  },
+  {
+   "id": 49,
+   "topic_id": 10,
+   "topic": "Kubernetes Job Troubleshooting",
+   "prompt": "Which resource setting helps prevent OOMKilled pods?",
+   "options": [
+    "Lower limits",
+    "Higher requests",
+    "Lower requests",
+    "No limits"
+   ],
+   "answer_index": 1,
+   "evidence": "Add resource requests to help scheduler",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 50,
+   "topic_id": 10,
+   "topic": "Kubernetes Job Troubleshooting",
+   "prompt": "What does setting activeDeadlineSeconds do?",
+   "options": [
+    "Limits number of retries",
+    "Kills job after specified time",
+    "Sets max parallelism",
+    "Sets pod memory limit"
+   ],
+   "answer_index": 1,
+   "evidence": "spec: activeDeadlineSeconds: 3600  # Kill job after 1 hour",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 51,
+   "topic_id": 10,
+   "topic": "Kubernetes Job Troubleshooting",
+   "prompt": "Which solution increases job throughput?",
+   "options": [
+    "Decrease parallelism",
+    "Increase parallelism",
+    "Set activeDeadlineSeconds",
+    "Use vertical pod autoscaler"
+   ],
+   "answer_index": 1,
+   "evidence": "Increase parallelism for parallelizable workloads spec: parallelism: 5 completions: 10",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 52,
+   "topic_id": 12,
+   "topic": "Job Resilience & Testing in Kubernetes",
+   "prompt": "What is the purpose of the progressive backoff code snippet?",
+   "options": [
+    "Increase API call frequency",
+    "Delay retries progressively",
+    "Reset counters",
+    "Log errors"
+   ],
+   "answer_index": 1,
+   "evidence": "sleep $((i * 10))  # Progressive backoff: 10s, 20s, 30s, 40s, 50s",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  },
+  {
+   "id": 53,
+   "topic_id": 12,
+   "topic": "Job Resilience & Testing in Kubernetes",
+   "prompt": "What does backoffLimit: 3 represent?",
+   "options": [
+    "Max number of API calls",
+    "Max number of job\u2011level retries",
+    "Max number of pods",
+    "Max number of containers"
+   ],
+   "answer_index": 1,
+   "evidence": "backoffLimit: 3  # Additional job\u2011level retries",
+   "status": "draft",
+   "auto_issues": [],
+   "verdict": {
+    "chosen_index": 1,
+    "another_option_also_correct": false,
+    "answerable_from_notes": true,
+    "clear": true,
+    "note": ""
+   },
+   "judge_correct": true
+  }
+ ]
+}

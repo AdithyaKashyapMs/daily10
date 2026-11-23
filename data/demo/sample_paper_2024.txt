@@ -1,0 +1,10 @@
+SAMPLE PAPER (demo data written for testing Daily 10, not a real university exam)
+Cloud Computing - 2024
+
+1. a) Explain the role of the kube-scheduler and kubelet in a Kubernetes cluster. (8 Marks)
+   b) What does etcd store and why is it important? (6 Marks)
+2. a) How do you prevent overlapping runs of a CronJob? Explain concurrencyPolicy. (10 Marks)
+   b) Explain ttlSecondsAfterFinished for cleaning up finished Jobs. (5 Marks)
+3. Explain how a HorizontalPodAutoscaler scales replicas based on CPU utilisation. (10 Marks)
+4. a) Describe the difference between completions and parallelism in a Job. (8 Marks)
+   b) How do you view the logs of a pod created by a Job? (4 Marks)
