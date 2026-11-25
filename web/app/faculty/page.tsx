@@ -37,7 +37,7 @@ export default function FacultyHome() {
     setBusy(true);
     setError("");
     try {
-      await api.createSubject(me.token, form);
+      await api.createSubject(form);
       setForm({ ...form, code: "", name: "" });
       await load();
     } catch (err) {

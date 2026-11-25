@@ -3,11 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-// Two kinds of sign-in, kept apart:
-//   students: a 6-character code (college email sign-in is a later step)
-//   faculty:  an email/password login token from /study/faculty/login
-const STUDENT = "daily10.code";
-const FACULTY = "daily10.faculty";
+// Sessions are httpOnly cookies set by the API: the browser sends them on every request and page
+// JavaScript can never read them, so an injected script can't steal a login. Route protection is in
+// middleware.ts (it redirects before a protected page renders).
+//
+// What's stored here is only non-secret UI state:
+//   STUDENT  "1" when this device signed in as a student (which home to show, the navbar)
+//   FACULTY  the faculty member's name / email / department, for the header
+const STUDENT = "daily10.signedIn.student";
+const FACULTY = "daily10.signedIn.faculty";
+// Before cookie sessions, raw login tokens were kept in localStorage. Never keep them around.
+const LEGACY = ["daily10.student", "daily10.faculty", "daily10.code"];
 
 function read(key: string): string | null {
   try {
@@ -22,46 +28,59 @@ function write(key: string, value: string | null) {
     else localStorage.setItem(key, value);
   } catch {}
 }
+function dropLegacyTokens() {
+  LEGACY.forEach((k) => write(k, null));
+}
 
-export const getCode = () => read(STUDENT);
-export const setCode = (code: string) => write(STUDENT, code.toUpperCase());
-export const clearCode = () => write(STUDENT, null);
+export const isStudent = () => read(STUDENT) === "1";
+export const markStudent = () => {
+  dropLegacyTokens();
+  write(STUDENT, "1");
+};
+export const clearStudent = () => write(STUDENT, null);
 
-export type FacultySession = { token: string; name: string; email: string; department: string };
-export function getFaculty(): FacultySession | null {
+export type FacultyProfile = { name: string; email: string; department: string };
+export function getFaculty(): FacultyProfile | null {
   const raw = read(FACULTY);
   try {
-    return raw ? (JSON.parse(raw) as FacultySession) : null;
+    return raw ? (JSON.parse(raw) as FacultyProfile) : null;
   } catch {
     return null;
   }
 }
-export const setFaculty = (s: FacultySession) => write(FACULTY, JSON.stringify(s));
+export const setFaculty = (p: FacultyProfile) => {
+  dropLegacyTokens();
+  write(FACULTY, JSON.stringify(p));
+};
 export const clearFaculty = () => write(FACULTY, null);
 
-/** The signed-in student's code; sends the user to the student login if there isn't one. */
-export function useStudentCode(): string | null {
-  const router = useRouter();
-  const [code, setState] = useState<string | null>(null);
+/** True once mounted on a signed-in student's device (middleware already sent everyone else away). */
+export function useStudent(): boolean {
+  const [ready, setReady] = useState(false);
   useEffect(() => {
-    // A link like /today?code=A1B2C3 (e.g. from a reminder) signs the student in on this device.
-    const fromLink = new URLSearchParams(window.location.search).get("code");
-    if (fromLink && /^[A-Za-z0-9]{6}$/.test(fromLink)) setCode(fromLink);
-    const c = getCode();
-    if (!c) router.replace("/auth/student");
-    else setState(c);
-  }, [router]);
-  return code;
+    dropLegacyTokens();
+    if (!isStudent()) write(STUDENT, "1"); // signed in on another tab or after an update: keep the hint right
+    setReady(true);
+  }, []);
+  return ready;
 }
 
-/** The signed-in faculty member; sends the user to the faculty login if there isn't one. */
-export function useFaculty(): FacultySession | null {
+/** The signed-in faculty member's profile (from cache, else the API); null while loading. */
+export function useFaculty(): FacultyProfile | null {
   const router = useRouter();
-  const [f, setState] = useState<FacultySession | null>(null);
+  const [f, setState] = useState<FacultyProfile | null>(null);
   useEffect(() => {
-    const s = getFaculty();
-    if (!s) router.replace("/auth/faculty");
-    else setState(s);
+    dropLegacyTokens();
+    const cached = getFaculty();
+    if (cached) return setState(cached);
+    fetch("/api/study/faculty/me", { credentials: "same-origin", cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error();
+        const p = (await r.json()) as FacultyProfile;
+        setFaculty(p);
+        setState(p);
+      })
+      .catch(() => router.replace("/auth/faculty"));
   }, [router]);
   return f;
 }

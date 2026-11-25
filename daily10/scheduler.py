@@ -12,6 +12,11 @@ if even the cap can't catch up, the session says the student is behind.
 One subject gets the new topic each day: the one most behind (highest topics-left per
 day-left), ties broken by the nearest exam.
 
+New questions climb a ladder: warmup (what a term means) -> core (why/how) -> exam (apply it).
+Every student gets the whole ladder, in that order, so harder questions come after a foothold.
+Students who consistently get things right skip the warm-up; students who are struggling get the
+topic's simple explanation first (see learner_band). Nobody is labelled: it follows their answers.
+
 Spaced repetition (reviews). Leitner boxes: a correct answer moves a question up a box and
 schedules it further out (1, 2, 4, 8, 16, 32 days); a wrong answer sends it back to box 0,
 due tomorrow. Each day shows the questions that are due, most overdue and weakest first.
@@ -27,6 +32,14 @@ NEW_QUESTIONS = 3
 REVIEWS_WITH_NEW_TOPIC = 2
 REVIEWS_REVISION_ONLY = 5
 LEITNER_DAYS = [1, 2, 4, 8, 16, 32]
+
+LEVEL_ORDER = {"warmup": 0, "core": 1, "exam": 2}
+LADDERS = {"struggling": ["warmup", "core", "exam"],
+           "steady": ["warmup", "core", "exam"],
+           "confident": ["core", "exam", "exam"]}
+BAND_MIN_ANSWERS = 6        # below this, too early to tell: "steady"
+STRUGGLING_BELOW = 0.6
+CONFIDENT_FROM = 0.85
 
 
 @dataclass
@@ -90,6 +103,33 @@ def select_reviews(due: list[DueReview], today: date, k: int) -> list[int]:
     ready = [r for r in due if r.due_on <= today]
     ready.sort(key=lambda r: (r.due_on, r.box, r.question_id))
     return [r.question_id for r in ready[:k]]
+
+
+def learner_band(attempts: int, correct: int) -> str:
+    """struggling | steady | confident, from a student's answers in one subject."""
+    if attempts < BAND_MIN_ANSWERS:
+        return "steady"
+    accuracy = correct / attempts
+    if accuracy < STRUGGLING_BELOW:
+        return "struggling"
+    return "confident" if accuracy >= CONFIDENT_FROM else "steady"
+
+
+def pick_new_questions(available: list[tuple[int, str]], band: str, k: int = NEW_QUESTIONS) -> list[int]:
+    """
+    Up to k question ids from (id, level) pairs, following the band's ladder; a missing level is
+    filled from the nearest other level. Returned easiest first, so the session climbs.
+    """
+    pool = sorted(available, key=lambda q: (LEVEL_ORDER.get(q[1], 1), q[0]))
+    chosen: list[tuple[int, str]] = []
+    for want in LADDERS.get(band, LADDERS["steady"])[:k]:
+        rest = [q for q in pool if q not in chosen]
+        if not rest:
+            break
+        target = LEVEL_ORDER[want]
+        chosen.append(min(rest, key=lambda q: (abs(LEVEL_ORDER.get(q[1], 1) - target), LEVEL_ORDER.get(q[1], 1), q[0])))
+    chosen.sort(key=lambda q: (LEVEL_ORDER.get(q[1], 1), q[0]))
+    return [qid for qid, _ in chosen]
 
 
 def leitner_update(box: int, correct: bool, today: date) -> tuple[int, date]:

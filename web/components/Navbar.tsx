@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { clearCode, clearFaculty, getCode, getFaculty } from "@/lib/session";
+import { clearFaculty, clearStudent, getFaculty, isStudent } from "@/lib/session";
 import { SnappyHead } from "./Snappy";
 
 export default function Navbar() {
@@ -14,14 +14,14 @@ export default function Navbar() {
 
   // Re-check who is signed in on every route change.
   useEffect(() => {
-    setRole(getFaculty() ? "faculty" : getCode() ? "student" : null);
+    setRole(getFaculty() ? "faculty" : isStudent() ? "student" : null);
   }, [pathname]);
 
   async function signOut() {
-    const f = getFaculty();
-    if (f) await api.facultyLogout(f.token).catch(() => {});
+    if (getFaculty()) await api.facultyLogout().catch(() => {});
+    if (isStudent()) await api.studentLogout().catch(() => {});
     clearFaculty();
-    clearCode();
+    clearStudent();
     setRole(null);
     router.replace("/");
   }

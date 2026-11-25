@@ -4,6 +4,7 @@ uvicorn[standard]
 python-multipart
 pydantic>=2
 sqlalchemy>=2.0
+psycopg[binary]>=3.2      # Postgres (STUDY_DATABASE_URL=postgresql+psycopg://...)
 python-dotenv
 requests
 
@@ -18,6 +19,9 @@ pdfplumber
 python-docx
 python-pptx
 beautifulsoup4
+
+# MCP server for faculty (daily10/mcp_server.py)
+mcp==2.3.0
 
 # Tests
 pytest

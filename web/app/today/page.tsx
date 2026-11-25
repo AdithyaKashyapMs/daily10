@@ -1,14 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { api, type AnswerResult, type Profile, type Session } from "@/lib/api";
-import { useStudentCode } from "@/lib/session";
+import { api, type AnswerResult, type Level, type Profile, type Session } from "@/lib/api";
+import { useStudent } from "@/lib/session";
 import { Loading, StudentFrame } from "@/components/BottomNav";
+import SimpleExplanation from "@/components/SimpleExplanation";
 import Snappy from "@/components/Snappy";
 
 type Step = { kind: "card" } | { kind: "question"; index: number } | { kind: "past" } | { kind: "done" };
 const LETTERS = ["A", "B", "C", "D"];
+const LEVELS: Record<Level, { label: string; tint: string }> = {
+  warmup: { label: "🌱 Warm-up", tint: "bg-mint-soft" },
+  core: { label: "📘 Core", tint: "bg-sun-soft" },
+  exam: { label: "🎯 Exam-style", tint: "bg-tomato-soft" },
+};
 
 function firstStep(s: Session): Step {
   const open = s.questions.findIndex((q) => !q.answered);
@@ -20,7 +27,8 @@ function firstStep(s: Session): Step {
 }
 
 export default function Today() {
-  const code = useStudentCode();
+  const ready = useStudent();
+  const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState("");
@@ -28,19 +36,22 @@ export default function Today() {
   const [results, setResults] = useState<Record<number, AnswerResult & { chosen: number }>>({});
   const [busy, setBusy] = useState(false);
   const [reported, setReported] = useState<Set<number>>(new Set());
+  const [simpleView, setSimpleView] = useState(false);
 
   const load = useCallback(async () => {
-    if (!code) return;
+    if (!ready) return;
     setError("");
     try {
-      const [s, p] = await Promise.all([api.today(code), api.profile(code)]);
+      const [s, p] = await Promise.all([api.today(), api.profile()]);
+      if (p.needs_profile) return router.replace("/auth/student?step=profile");
       setSession(s);
       setProfile(p);
       setStep(firstStep(s));
+      setSimpleView(Boolean(s.card?.simple && s.card.start_simple));
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [code]);
+  }, [ready, router]);
 
   useEffect(() => {
     load();
@@ -50,10 +61,10 @@ export default function Today() {
   const answeredNow = Object.values(results);
 
   async function choose(qid: number, index: number) {
-    if (!code || results[qid] || busy) return;
+    if (results[qid] || busy) return;
     setBusy(true);
     try {
-      const r = await api.answer(code, qid, index);
+      const r = await api.answer(qid, index);
       setResults((prev) => ({ ...prev, [qid]: { ...r, chosen: index } }));
     } catch (e) {
       setError((e as Error).message);
@@ -85,7 +96,7 @@ export default function Today() {
   const day = session ? new Date(session.day + "T00:00:00").toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" }) : "";
 
   let body: React.ReactNode;
-  if (!code || (!session && !error)) {
+  if (!ready || (!session && !error)) {
     body = <Loading label="Getting today's 10 minutes ready…" />;
   } else if (!session) {
     body = (
@@ -120,16 +131,42 @@ export default function Today() {
           </div>
           <div className="p-5">
             <h2 className="font-display text-3xl font-extrabold leading-tight">{c.title}</h2>
-            {c.summary ? <p className="mt-3 font-semibold leading-relaxed text-ink/85">{c.summary}</p> : <p className="mt-3 text-ink-soft">Summary not ready yet.</p>}
-            {c.key_points?.length > 0 && (
-              <ul className="mt-4 space-y-2">
-                {c.key_points.map((p, i) => (
-                  <li key={i} className="sticker-flat flex gap-2.5 bg-sun-soft px-3 py-2 font-semibold">
-                    <span aria-hidden>⭐</span>
-                    {p}
-                  </li>
+            {c.simple && (
+              <div className="mt-3 flex gap-2" role="tablist" aria-label="Explanation style">
+                {[
+                  { simple: false, label: "📖 Full" },
+                  { simple: true, label: "🧩 Explain simply" },
+                ].map((t) => (
+                  <button
+                    key={t.label}
+                    role="tab"
+                    aria-selected={simpleView === t.simple}
+                    onClick={() => setSimpleView(t.simple)}
+                    className={`chip cursor-pointer ${simpleView === t.simple ? "bg-ink text-white" : "bg-white"}`}
+                  >
+                    {t.label}
+                  </button>
                 ))}
-              </ul>
+              </div>
+            )}
+            {c.simple && simpleView ? (
+              <div className="mt-3">
+                <SimpleExplanation layer={c.simple} />
+              </div>
+            ) : (
+              <>
+                {c.summary ? <p className="mt-3 font-semibold leading-relaxed text-ink/85">{c.summary}</p> : <p className="mt-3 text-ink-soft">Summary not ready yet.</p>}
+                {c.key_points?.length > 0 && (
+                  <ul className="mt-4 space-y-2">
+                    {c.key_points.map((p, i) => (
+                      <li key={i} className="sticker-flat flex gap-2.5 bg-sun-soft px-3 py-2 font-semibold">
+                        <span aria-hidden>⭐</span>
+                        {p}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
             <p className="mt-4 text-sm font-semibold text-ink-soft">From your notes: {c.source}</p>
           </div>
@@ -144,7 +181,10 @@ export default function Today() {
       <>
         <article className="sticker-lg p-5">
           <div className="flex items-center justify-between gap-2">
-            <span className={`chip ${q.kind === "new" ? "bg-sky-soft" : "bg-plum-soft"}`}>{q.kind === "new" ? "🆕 New" : "🔁 Review"}</span>
+            <span className="flex flex-wrap gap-1.5">
+              <span className={`chip ${q.kind === "new" ? "bg-sky-soft" : "bg-plum-soft"}`}>{q.kind === "new" ? "🆕 New" : "🔁 Review"}</span>
+              {q.level && <span className={`chip ${LEVELS[q.level].tint}`}>{LEVELS[q.level].label}</span>}
+            </span>
             <span className="font-display text-lg font-extrabold">{step.index + 1}/{total}</span>
           </div>
           <p className="mt-1 text-sm font-semibold text-ink-soft">{q.topic}</p>
@@ -183,6 +223,12 @@ export default function Today() {
                 {new Date(r.next_review + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
               </p>
             </div>
+          </div>
+        )}
+        {r && !r.correct && r.simple && (
+          <div className="sticker pop-in bg-white p-4" aria-live="polite">
+            <p className="mb-2 font-display text-xl font-extrabold">🧩 Let&apos;s make it simpler</p>
+            <SimpleExplanation layer={r.simple} compact />
           </div>
         )}
         {r && (

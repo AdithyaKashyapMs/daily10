@@ -4,6 +4,7 @@ from datetime import date, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from tests.conftest import fresh_database
 from daily10 import content, db, generate, notify, scheduler, service
 
 NOTES = (
@@ -38,7 +39,7 @@ class FakeLLM:
 
 @pytest.fixture(autouse=True)
 def fresh_db():
-    db.init("sqlite://")
+    fresh_database()
     yield
 
 
@@ -176,7 +177,12 @@ def test_reminders_sent_once_per_day_after_chosen_time():
     make_subject()
     student = service.register_student("Asha Rao", "07:30")
     service.enroll(student.code, "CS501", exam_date=date.today() + timedelta(days=60))
-    assert "Linked" in notify.handle_message("555", f"/start {student.code}")
+    from daily10 import student_auth
+
+    assert "expired" in notify.handle_message("555", f"/start {student.code}")   # the student code isn't a link code
+    link = student_auth.telegram_link_code(student.id)
+    assert "Linked" in notify.handle_message("555", f"/start {link}")
+    assert "expired" in notify.handle_message("666", f"/start {link}")           # single use
     sent = []
     sender = lambda chat, text: sent.append((chat, text))  # noqa: E731
     today = date.today()
@@ -189,24 +195,37 @@ def test_reminders_sent_once_per_day_after_chosen_time():
 
 # --- API -------------------------------------------------------------------------------------
 
+def sign_in(client, monkeypatch, email="asha@uvce.ac.in", name="Asha", notify_time="07:30") -> dict:
+    """Sign up with a password. Returns Bearer auth headers."""
+    r = client.post("/study/students/auth/register", json={"email": email, "name": name, "password": "a-good-password",
+                                                           "notify_time": notify_time, "return_token": True})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['token']}"}
+
+
 def test_api_student_flow_and_admin_key(monkeypatch):
     from daily10 import main
 
     make_subject()
     client = TestClient(main.app)
-    code = client.post("/study/students", json={"name": "Asha", "notify_time": "07:30"}).json()["code"]
-    assert client.post(f"/study/students/{code}/enroll",
+    me_auth = sign_in(client, monkeypatch)
+    assert client.post("/study/students/me/enroll", headers=me_auth,
                        json={"subject_code": "CS501", "exam_date": str(date.today() + timedelta(days=60))}).status_code == 200
-    today = client.get(f"/study/students/{code}/today").json()
+    today = client.get("/study/students/me/today", headers=me_auth).json()
     qid = today["questions"][0]["id"]
-    r = client.post(f"/study/students/{code}/answers", json={"question_id": qid, "chosen_index": 0}).json()
+    r = client.post("/study/students/me/answers", headers=me_auth, json={"question_id": qid, "chosen_index": 0}).json()
     assert r["correct"] and r["evidence"]
-    assert client.get("/study/students/NOPE/today").status_code == 404
-    me = client.get(f"/study/students/{code}").json()
+    anon = TestClient(main.app)                                                       # no cookie, no token
+    assert anon.get("/study/students/me/today").status_code == 401
+    assert client.get("/study/students/me/today", headers={"Authorization": "Bearer forged"}).status_code == 401
+    me = client.get("/study/students/me", headers=me_auth).json()
     assert me["notify_time"] == "07:30" and me["subjects"][0]["code"] == "CS501" and not me["telegram_linked"]
-    assert client.patch(f"/study/students/{code}", json={"notify_time": "21:15"}).status_code == 200
-    assert client.get(f"/study/students/{code}").json()["notify_time"] == "21:15"
-    assert client.post("/study/students", json={"name": "X", "notify_time": "25:00"}).status_code == 422
+    assert me["email"] == "asha@uvce.ac.in" and "code" not in me
+    assert client.patch("/study/students/me", headers=me_auth, json={"notify_time": "21:15"}).status_code == 200
+    assert client.get("/study/students/me", headers=me_auth).json()["notify_time"] == "21:15"
+    assert client.patch("/study/students/me", headers=me_auth, json={"notify_time": "25:00"}).status_code == 422
+    assert anon.post(f"/study/questions/{qid}/report").status_code == 401             # reports need a student
+    assert client.post(f"/study/questions/{qid}/report", headers=me_auth).status_code == 200
 
     monkeypatch.setenv("STUDY_ADMIN_KEY", "secret")
     assert client.get("/study/subjects/CS501/questions").status_code == 401
@@ -228,12 +247,14 @@ def test_faculty_accounts_and_protected_endpoints(monkeypatch):
     assert client.post("/study/faculty/register", json=body | {"invite_code": "uni-invite"}).status_code == 409
 
     assert client.post("/study/faculty/login", json={"email": "rao@uvce.edu", "password": "wrong-pass"}).status_code == 401
-    token = client.post("/study/faculty/login", json={"email": "RAO@uvce.edu", "password": "longpassword1"}).json()["token"]
+    token = client.post("/study/faculty/login", json={"email": "RAO@uvce.edu", "password": "longpassword1",
+                                                      "return_token": True}).json()["token"]
     bearer = {"Authorization": f"Bearer {token}"}
     assert client.get("/study/faculty/me", headers=bearer).json()["name"] == "Dr. Rao"
 
     # Faculty endpoints: open to a valid token or the key, closed otherwise.
-    assert client.post("/study/subjects", json={"code": "CS502", "name": "DBMS"}).status_code == 401
+    anon = TestClient(main.app)
+    assert anon.post("/study/subjects", json={"code": "CS502", "name": "DBMS"}).status_code == 401
     assert client.post("/study/subjects", json={"code": "CS502", "name": "DBMS"}, headers=bearer).status_code == 200
     assert client.get("/study/subjects/CS502/questions", headers={"Authorization": "Bearer forged"}).status_code == 401
     client.post("/study/faculty/logout", headers=bearer)

@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+.pytest_cache
+**/__pycache__
+.env
+.env.*
+!.env.example
+!.env.production.example
+*.sqlite*
+web
+evals
+tests
+data
+deploy

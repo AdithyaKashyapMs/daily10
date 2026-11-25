@@ -3,10 +3,11 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, type Profile, type Subject } from "@/lib/api";
-import { clearCode, useStudentCode } from "@/lib/session";
+import { clearStudent, useStudent } from "@/lib/session";
 import { Loading, StudentFrame } from "@/components/BottomNav";
+import PasswordInput from "@/components/PasswordInput";
 
-const BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT ?? "";
+const BOT = (process.env.NEXT_PUBLIC_TELEGRAM_BOT ?? "").replace(/^@/, "");
 
 function inDays(n: number) {
   const d = new Date();
@@ -15,7 +16,7 @@ function inDays(n: number) {
 }
 
 function SettingsInner() {
-  const code = useStudentCode();
+  const ready = useStudent();
   const router = useRouter();
   const welcome = useSearchParams()?.get("welcome") === "1";
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -25,12 +26,13 @@ function SettingsInner() {
   const [time, setTime] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [pw, setPw] = useState({ open: false, current: "", next: "", busy: false });
 
   const load = useCallback(async () => {
-    if (!code) return;
+    if (!ready) return;
     try {
-      const [p, s] = await Promise.all([api.profile(code), api.subjects()]);
+      const [p, s] = await Promise.all([api.profile(), api.subjects()]);
       setProfile(p);
       setTime(p.notify_time);
       setSubjects(s);
@@ -39,16 +41,16 @@ function SettingsInner() {
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [code]);
+  }, [ready]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   async function addSubject() {
-    if (!code || !pick) return;
+    if (!pick) return;
     try {
-      await api.enroll(code, pick, exam);
+      await api.enroll(pick, exam);
       setSaved("Subject added. Your plan starts today.");
       await load();
     } catch (e) {
@@ -57,22 +59,50 @@ function SettingsInner() {
   }
 
   async function saveTime() {
-    if (!code) return;
     try {
-      await api.updateReminder(code, time);
+      await api.updateReminder(time);
       setSaved(`Reminder set for ${time} every day.`);
     } catch (e) {
       setError((e as Error).message);
     }
   }
 
-  async function copyCode() {
-    if (!code) return;
+  async function linkTelegram() {
+    // Open the tab first (in the click), then point it at the bot: phones block pop-ups opened later.
+    const tab = window.open("", "_blank");
+    setLinking(true);
     try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
+      const link = await api.telegramLink();
+      const url = link.url ?? `https://t.me/${BOT}?start=${link.code}`;
+      if (tab) tab.location.href = url;
+      else window.location.href = url;
+      setSaved("In Telegram, tap Start. Then come back here.");
+    } catch (e) {
+      tab?.close();
+      setError((e as Error).message);
+    } finally {
+      setLinking(false);
+    }
+  }
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setPw((p) => ({ ...p, busy: true }));
+    try {
+      await api.changePassword(pw.current, pw.next);
+      setPw({ open: false, current: "", next: "", busy: false });
+      setSaved("Password changed.");
+    } catch (err) {
+      setError((err as Error).message);
+      setPw((p) => ({ ...p, busy: false }));
+    }
+  }
+
+  async function logOut(everywhere: boolean) {
+    await api.studentLogout(everywhere).catch(() => {});
+    clearStudent();
+    router.replace("/");
   }
 
   if (!profile) return error ? <p className="alert alert-error">{error}</p> : <Loading label="Loading…" />;
@@ -83,7 +113,7 @@ function SettingsInner() {
       {welcome && (
         <div className="sticker bg-mint-soft p-4">
           <p className="font-display text-xl font-extrabold">Welcome, {profile.name.split(" ")[0]}! 👋</p>
-          <p className="mt-1 font-semibold">Your code is <b className="font-mono tracking-widest">{profile.code}</b>. Keep it to log in on another phone.</p>
+          <p className="mt-1 font-semibold">On another phone, just log in with {profile.email ?? "your college email"} again.</p>
           <p className="mt-1 font-semibold">Next: add your subjects and exam dates below.</p>
         </div>
       )}
@@ -126,20 +156,45 @@ function SettingsInner() {
           {profile.telegram_linked
             ? "✅ Telegram reminders are on."
             : BOT
-              ? <>Get reminders on Telegram: open <a className="font-extrabold text-tomato underline" href={`https://t.me/${BOT}?start=${profile.code}`}>@{BOT}</a> and tap Start.</>
+              ? "Get your daily reminder as a Telegram message."
               : "Telegram reminders will appear here once your college sets up the bot."}
         </p>
+        {!profile.telegram_linked && BOT && (
+          <button onClick={linkTelegram} disabled={linking} className="btn btn-white btn-block">
+            {linking ? "Opening Telegram…" : "Turn on Telegram reminders"}
+          </button>
+        )}
       </section>
 
-      <section className="sticker flex items-center justify-between gap-3 p-5">
+      <section className="sticker flex flex-col gap-3 p-5">
         <div>
-          <p className="font-bold text-ink-soft">Your login code</p>
-          <p className="font-mono text-2xl font-bold tracking-[0.3em]">{profile.code}</p>
+          <p className="font-bold text-ink-soft">Signed in as</p>
+          <p className="font-bold">{profile.email ?? profile.name}</p>
         </div>
-        <button onClick={copyCode} className="btn btn-sun btn-sm">{copied ? "Copied!" : "Copy"}</button>
+        {pw.open ? (
+          <form onSubmit={changePassword} className="space-y-3">
+            <div>
+              <label htmlFor="pw-current" className="label">Current password</label>
+              <PasswordInput id="pw-current" value={pw.current} onChange={(v) => setPw((p) => ({ ...p, current: v }))} autoComplete="current-password" />
+            </div>
+            <div>
+              <label htmlFor="pw-next" className="label">New password</label>
+              <PasswordInput id="pw-next" value={pw.next} onChange={(v) => setPw((p) => ({ ...p, next: v }))} autoComplete="new-password" minLength={8} />
+              <p className="hint">At least 8 characters.</p>
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" disabled={pw.busy || !pw.current || pw.next.length < 8} className="btn btn-primary flex-1">
+                {pw.busy ? "Saving…" : "Save password"}
+              </button>
+              <button type="button" onClick={() => setPw({ open: false, current: "", next: "", busy: false })} className="btn btn-white">Cancel</button>
+            </div>
+          </form>
+        ) : (
+          <button onClick={() => setPw((p) => ({ ...p, open: true }))} className="btn btn-white btn-block">Change password</button>
+        )}
+        <button onClick={() => logOut(false)} className="btn btn-white btn-block">Log out</button>
+        <button onClick={() => logOut(true)} className="text-sm font-bold text-ink-soft underline">Log out on all my devices</button>
       </section>
-
-      <button onClick={() => { clearCode(); router.replace("/"); }} className="btn btn-white btn-block">Log out</button>
     </>
   );
 }

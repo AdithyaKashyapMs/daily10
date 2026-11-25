@@ -21,7 +21,7 @@ export default function FacultyLogin() {
     setLoading(true);
     try {
       const res = mode === "login" ? await api.facultyLogin(form.email, form.password) : await api.facultyRegister(form);
-      setFaculty({ token: res.token, ...res.faculty });
+      setFaculty(res.faculty);
       router.replace("/faculty");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -63,7 +63,8 @@ export default function FacultyLogin() {
         </div>
         <div>
           <label htmlFor="f-password" className="label">Password</label>
-          <input id="f-password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} value={form.password} onChange={set("password")} required minLength={mode === "register" ? 8 : undefined} className="input" />
+          <input id="f-password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} value={form.password} onChange={set("password")} required minLength={mode === "register" ? 10 : undefined} className="input" />
+          {mode === "register" && <p className="hint">At least 10 characters. A short phrase is easiest to remember.</p>}
           {mode === "register" && <p className="hint">At least 8 characters.</p>}
         </div>
         {mode === "register" && (

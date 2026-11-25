@@ -8,7 +8,7 @@ from datetime import date, timedelta
 import logging
 from sqlalchemy import func, select
 
-from daily10 import content, db, generate, scheduler
+from daily10 import config, content, db, generate, scheduler
 from daily10.db import (
     DailySession,
     Enrollment,
@@ -82,29 +82,58 @@ def add_past_paper(subject_code: str, text: str, year: int | None = None) -> int
         return len(questions)
 
 
+def _store_simple(topic: Topic, layer: "generate.SimpleLayer") -> bool:
+    """Save a topic's simple layer as a draft for faculty review. False if the model gave nothing usable."""
+    if not layer.has_content():
+        return False
+    topic.simple_explanation, topic.analogy = layer.simple_explanation.strip(), layer.analogy.strip()
+    topic.glossary = [g.model_dump() for g in layer.glossary]
+    topic.simple_status = "draft"
+    return True
+
+
 def generate_questions(subject_code: str, llm, only_missing: bool = True, limit: int | None = None) -> dict:
-    """Run the LLM over each topic: title, summary, key points, grounded questions (as drafts)."""
+    """
+    Run the LLM over each topic: title, summary, key points, the simple layer and grounded
+    questions (all as drafts). Topics generated before the simple layer existed get just that
+    layer, and the same call tags their existing questions warmup / core / exam.
+    `limit` counts LLM calls (topics), to stay inside free-tier quotas.
+    """
     subject = get_subject(subject_code)
-    stats = {"topics": 0, "draft": 0, "auto_rejected": 0, "failed_topics": 0}
+    stats = {"topics": 0, "draft": 0, "auto_rejected": 0, "failed_topics": 0, "simple_explanations": 0,
+             "levels_tagged": 0}
     with db.session() as s:
         topics = s.scalars(select(Topic).where(Topic.subject_id == subject.id).order_by(Topic.position)).all()
         for topic in topics:
-            if only_missing and topic.summary:
+            backfill = bool(topic.summary) and not topic.simple_status
+            if only_missing and topic.summary and not backfill:
                 continue
             if limit is not None and stats["topics"] >= limit:
                 break
             try:
+                if only_missing and backfill:
+                    existing = [(q.id, q.prompt) for q in topic.questions if q.status in ("draft", "approved")]
+                    layer, levels = generate.generate_simple(topic.text, llm, existing)
+                    stats["simple_explanations"] += _store_simple(topic, layer)
+                    for q in topic.questions:
+                        if q.id in levels:
+                            q.level = levels[q.id]
+                    stats["levels_tagged"] += len(levels)
+                    stats["topics"] += 1
+                    s.commit()
+                    continue
                 pack = generate.generate_pack(topic.text, llm)
             except Exception as e:
                 log.error(f"Generation failed for topic {topic.id}: {e}")
                 stats["failed_topics"] += 1
                 continue
             topic.title, topic.summary, topic.key_points = pack.title, pack.summary, pack.key_points
+            stats["simple_explanations"] += _store_simple(topic, pack)
             for q in pack.questions:
                 issue = generate.grounding_issue(q, topic.text)
                 s.add(Question(
                     topic_id=topic.id, prompt=q.question, options=q.options, answer_index=q.answer_index,
-                    explanation=q.explanation, evidence=q.evidence,
+                    explanation=q.explanation, evidence=q.evidence, level=q.level,
                     status="auto_rejected" if issue else "draft", status_reason=issue or "",
                 ))
                 stats["auto_rejected" if issue else "draft"] += 1
@@ -136,14 +165,123 @@ def set_question_status(question_id: int, status: str, reason: str = "") -> None
         s.commit()
 
 
-def report_question(question_id: int) -> None:
+def set_question_level(question_id: int, level: str) -> dict:
+    """Re-tag a question warmup / core / exam. Its content doesn't change, so it keeps its status."""
+    if level not in generate.LEVELS:
+        raise ValueError(f"level must be one of {', '.join(generate.LEVELS)}")
+    with db.session() as s:
+        q = s.get(Question, question_id)
+        if not q:
+            raise NotFound(f"No question {question_id}")
+        q.level = level
+        s.commit()
+        return _question_view(q, q.topic, reveal=True)
+
+
+def _explanation_view(t: Topic) -> dict:
+    return {"topic_id": t.id, "position": t.position, "title": t.title or t.source, "summary": t.summary,
+            "simple_explanation": t.simple_explanation, "analogy": t.analogy, "glossary": t.glossary or [],
+            "status": t.simple_status}
+
+
+def list_explanations(subject_code: str, status: str | None = None) -> list[dict]:
+    """Topics' simple layers for faculty review (topics without one are left out)."""
+    subject = get_subject(subject_code)
+    with db.session() as s:
+        stmt = select(Topic).where(Topic.subject_id == subject.id, Topic.simple_status != "")
+        if status:
+            stmt = stmt.where(Topic.simple_status == status)
+        return [_explanation_view(t) for t in s.scalars(stmt.order_by(Topic.position))]
+
+
+def review_explanation(topic_id: int, status: str, changes: dict | None = None) -> dict:
+    """
+    Approve or reject a topic's simple layer, optionally fixing the wording first. Glossary terms
+    must still appear in the topic's notes; students see the layer only once it is approved.
+    """
+    if status not in ("approved", "rejected", "draft"):
+        raise ValueError("status must be approved, rejected or draft")
+    changes = {k: v for k, v in (changes or {}).items() if v is not None}
+    unknown = set(changes) - {"simple_explanation", "analogy", "glossary"}
+    if unknown:
+        raise ValueError(f"Can't edit {sorted(unknown)}")
+    with db.session() as s:
+        t = s.get(Topic, topic_id)
+        if not t:
+            raise NotFound(f"No topic {topic_id}")
+        if "simple_explanation" in changes:
+            t.simple_explanation = changes["simple_explanation"].strip()
+        if "analogy" in changes:
+            t.analogy = changes["analogy"].strip()
+        if "glossary" in changes:
+            terms = [generate.GlossaryTerm.model_validate(g) for g in changes["glossary"]]
+            t.glossary = [g.model_dump() for g in generate.grounded_glossary(terms, t.text)]
+        if status == "approved" and not (t.simple_explanation or t.glossary):
+            raise ValueError("Nothing to approve: this topic has no simple explanation yet.")
+        t.simple_status = status
+        s.commit()
+        return _explanation_view(t)
+
+
+def edit_question(question_id: int, changes: dict, editor: str = "faculty") -> dict:
+    """
+    Change a question's wording, options, answer or evidence. The result goes through the same
+    checks as generated questions (4 distinct options, evidence quoted from the topic's notes)
+    and goes back to draft, so it is approved (and AI-checked) again before students see it.
+    """
+    allowed = {"prompt", "options", "answer_index", "explanation", "evidence"}
+    unknown = set(changes) - allowed
+    if unknown:
+        raise ValueError(f"Can't edit {sorted(unknown)}; editable fields: {sorted(allowed)}")
+    with db.session() as s:
+        q = s.get(Question, question_id)
+        if not q:
+            raise NotFound(f"No question {question_id}")
+        merged = {"prompt": q.prompt, "options": q.options, "answer_index": q.answer_index,
+                  "explanation": q.explanation, "evidence": q.evidence} | {k: v for k, v in changes.items() if v is not None}
+        checked = generate.GeneratedQuestion(question=merged["prompt"], options=merged["options"],
+                                             answer_index=merged["answer_index"], explanation=merged["explanation"],
+                                             evidence=merged["evidence"])
+        issue = generate.grounding_issue(checked, q.topic.text)
+        if issue:
+            raise ValueError(f"{issue}: quote the evidence word for word from topic {q.topic_id}'s notes")
+        q.prompt, q.options, q.answer_index = checked.question, checked.options, checked.answer_index
+        q.explanation, q.evidence = checked.explanation, checked.evidence
+        q.status, q.status_reason = "draft", f"edited by {editor}; needs approval"
+        s.commit()
+        return _question_view(q, q.topic, reveal=True)
+
+
+def add_question(topic_id: int, q: "generate.GeneratedQuestion", reason: str) -> dict:
+    """Save a question written on request (not by bulk generation) after the usual checks."""
+    from daily10 import quality
+
+    with db.session() as s:
+        topic = s.get(Topic, topic_id)
+        if not topic:
+            raise NotFound(f"No topic {topic_id}")
+        same_topic = [{"id": x.id, "prompt": x.prompt} for x in topic.questions]
+        issues = quality.automatic_issues(
+            {"id": 10**9, "prompt": q.question, "options": q.options, "answer_index": q.answer_index,
+             "evidence": q.evidence, "notes": topic.text}, same_topic)
+        row = Question(topic_id=topic.id, prompt=q.question, options=q.options, answer_index=q.answer_index,
+                       explanation=q.explanation, evidence=q.evidence, level=q.level,
+                       status="auto_rejected" if issues else "draft",
+                       status_reason="; ".join(issues) if issues else reason)
+        s.add(row)
+        s.commit()
+        return _question_view(row, topic, reveal=True)
+
+
+def report_question(question_id: int, reason: str = "") -> None:
     """A student says the question is wrong: count it and send it back for faculty review."""
     with db.session() as s:
         q = s.get(Question, question_id)
         if not q:
             raise NotFound(f"No question {question_id}")
         q.reports += 1
-        q.status, q.status_reason = "draft", f"reported by students ({q.reports})"
+        note = f": {reason.strip()[:200]}" if reason.strip() else ""
+        q.status, q.status_reason = "draft", f"reported by students ({q.reports}){note}"
         s.commit()
 
 
@@ -157,15 +295,15 @@ def topic_overview(subject_code: str) -> list[dict]:
             counts = dict(s.execute(select(Question.status, func.count()).where(Question.topic_id == t.id)
                                     .group_by(Question.status)).all())
             out.append({"id": t.id, "position": t.position, "title": t.title or t.source, "source": t.source,
-                        "exam_weight": t.exam_weight, "questions": counts})
+                        "exam_weight": t.exam_weight, "questions": counts, "simple_status": t.simple_status})
         return out
 
 
 # --- Students ------------------------------------------------------------------------------
 
-def register_student(name: str, notify_time: str = "19:00") -> Student:
+def register_student(name: str, notify_time: str = "19:00", email: str | None = None) -> Student:
     with db.session() as s:
-        student = Student(code=secrets.token_hex(3).upper(), name=name.strip(), notify_time=notify_time)
+        student = Student(code=secrets.token_hex(3).upper(), name=name.strip(), notify_time=notify_time, email=email)
         s.add(student)
         s.commit()
         return student
@@ -188,27 +326,31 @@ def enroll(student_code: str, subject_code: str, exam_date: date, start_date: da
             existing.exam_date = exam_date
         else:
             s.add(Enrollment(student_id=student.id, subject_id=subject.id,
-                             start_date=start_date or date.today(), exam_date=exam_date))
+                             start_date=start_date or config.local_today(), exam_date=exam_date))
         s.commit()
 
 
-def set_preferences(student_code: str, notify_time: str | None = None, telegram_chat_id: str | None = None) -> None:
+def set_preferences(student_code: str, notify_time: str | None = None, telegram_chat_id: str | None = None,
+                    name: str | None = None) -> None:
     student = get_student(student_code)
     with db.session() as s:
         st = s.get(Student, student.id)
+        if name:
+            st.name = name.strip()[:120]
         if notify_time:
             st.notify_time = notify_time
         if telegram_chat_id is not None:
-            st.telegram_chat_id = telegram_chat_id
+            st.telegram_chat_id = telegram_chat_id or None  # "" unlinks
         s.commit()
 
 
 # --- The daily session ---------------------------------------------------------------------
 
 def _question_view(q: Question, topic: Topic, reveal: bool = False) -> dict:
-    view = {"id": q.id, "topic": topic.title or topic.source, "prompt": q.prompt, "options": q.options}
+    view = {"id": q.id, "topic": topic.title or topic.source, "prompt": q.prompt, "options": q.options,
+            "level": q.level or "core"}
     if reveal:
-        view |= {"answer_index": q.answer_index, "explanation": q.explanation, "evidence": q.evidence,
+        view |= {"topic_id": topic.id, "answer_index": q.answer_index, "explanation": q.explanation, "evidence": q.evidence,
                  "status": q.status, "status_reason": q.status_reason, "reports": q.reports}
     return view
 
@@ -222,6 +364,28 @@ def _subject_plans(s, student: Student) -> list[scheduler.SubjectPlan]:
     return plans
 
 
+def _simple_layer(topic: Topic) -> dict | None:
+    """What students see of the "explain simply" layer: only once faculty approved it."""
+    if topic.simple_status != "approved":
+        return None
+    return {"explanation": topic.simple_explanation, "analogy": topic.analogy, "glossary": topic.glossary or []}
+
+
+def _terms_in(glossary: list[dict], text: str) -> list[dict]:
+    """Glossary entries whose term appears in `text` (a question, its options and explanation)."""
+    words = " " + " ".join(generate._words(text)) + " "
+    return [g for g in glossary if f" {' '.join(generate._words(g['term']))} " in words]
+
+
+def _band(s, student_id: int, subject_id: int) -> str:
+    """The student's learner band in one subject, from their answers so far."""
+    attempts, correct = s.execute(
+        select(func.coalesce(func.sum(Review.attempts), 0), func.coalesce(func.sum(Review.correct), 0))
+        .select_from(Review).join(Question).join(Topic)
+        .where(Review.student_id == student_id, Topic.subject_id == subject_id)).one()
+    return scheduler.learner_band(int(attempts), int(correct))
+
+
 def _build_plan(s, student: Student, today: date) -> dict:
     plans = _subject_plans(s, student)
     chosen = scheduler.pick_subject(plans, today)
@@ -230,11 +394,13 @@ def _build_plan(s, student: Student, today: date) -> dict:
     if chosen:
         topic = s.get(Topic, scheduler.next_topic(chosen))
         subject = s.get(Subject, chosen.subject_id)
+        band = _band(s, student.id, subject.id)
         plan["card"] = {"topic_id": topic.id, "subject": subject.name, "title": topic.title or topic.source,
                         "summary": topic.summary, "key_points": topic.key_points, "source": topic.source,
-                        "exam_weight": topic.exam_weight}
-        new_qs = s.scalars(select(Question.id).where(Question.topic_id == topic.id, Question.status == "approved")
-                           .order_by(Question.id).limit(scheduler.NEW_QUESTIONS)).all()
+                        "exam_weight": topic.exam_weight, "start_simple": band == "struggling"}
+        available = s.execute(select(Question.id, Question.level)
+                              .where(Question.topic_id == topic.id, Question.status == "approved")).all()
+        new_qs = scheduler.pick_new_questions([(qid, level or "core") for qid, level in available], band)
         plan["questions"] += [{"id": qid, "kind": "new"} for qid in new_qs]
         past = s.scalar(select(PastQuestion).where(PastQuestion.topic_id == topic.id)
                         .order_by(PastQuestion.year.desc().nulls_last(), PastQuestion.id))
@@ -259,7 +425,7 @@ def _build_plan(s, student: Student, today: date) -> dict:
 
 def today_session(student_code: str, today: date | None = None) -> dict:
     """Today's session for a student. Built on first open, then fixed for the day."""
-    today = today or date.today()
+    today = today or config.local_today()
     student = get_student(student_code)
     with db.session() as s:
         existing = s.scalar(select(DailySession).where(DailySession.student_id == student.id,
@@ -277,12 +443,15 @@ def today_session(student_code: str, today: date | None = None) -> dict:
             if q is None:
                 continue
             questions.append({**_question_view(q, q.topic), "kind": item["kind"], "answered": q.id in answered})
+        if plan.get("card"):
+            topic = s.get(Topic, plan["card"]["topic_id"])
+            plan["card"] = {"start_simple": False, **plan["card"], "simple": _simple_layer(topic) if topic else None}
         return {**plan, "questions": questions, "completed": existing.completed, "student": student.name}
 
 
 def submit_answer(student_code: str, question_id: int, chosen_index: int, today: date | None = None) -> dict:
     """Record an answer, update spaced repetition, and return the correct answer with its evidence."""
-    today = today or date.today()
+    today = today or config.local_today()
     student = get_student(student_code)
     with db.session() as s:
         q = s.get(Question, question_id)
@@ -305,15 +474,21 @@ def submit_answer(student_code: str, question_id: int, chosen_index: int, today:
             done = set(s.scalars(select(Review.question_id).where(Review.student_id == student.id,
                                                                   Review.last_answered_on == today)))
             session.completed = planned <= done
+        help_ = None
+        layer = None if correct else _simple_layer(q.topic)
+        if layer:
+            text = " ".join([q.prompt, *q.options, q.explanation])
+            help_ = {"explanation": layer["explanation"], "analogy": layer["analogy"],
+                     "glossary": _terms_in(layer["glossary"], text)}
         s.commit()
         return {"correct": correct, "answer_index": q.answer_index, "explanation": q.explanation,
                 "evidence": q.evidence, "next_review": review.due_on.isoformat(),
-                "session_completed": bool(session and session.completed)}
+                "session_completed": bool(session and session.completed), "simple": help_}
 
 
 def progress(student_code: str, today: date | None = None) -> dict:
     """Coverage per subject, streak, and weakest topics."""
-    today = today or date.today()
+    today = today or config.local_today()
     student = get_student(student_code)
     with db.session() as s:
         learned = set(s.scalars(select(TopicProgress.topic_id).where(TopicProgress.student_id == student.id)))
@@ -367,7 +542,7 @@ def mark_notified(student_id: int, today: date) -> None:
 
 def preview_today(student_code: str, today: date | None = None) -> dict:
     """What today's session will cover, without building it (used for reminders)."""
-    today = today or date.today()
+    today = today or config.local_today()
     student = get_student(student_code)
     with db.session() as s:
         existing = s.scalar(select(DailySession).where(DailySession.student_id == student.id, DailySession.day == today))
@@ -401,8 +576,9 @@ def student_profile(student_code: str) -> dict:
     with db.session() as s:
         enrolled = [{"code": e.subject.code, "name": e.subject.name, "exam_date": e.exam_date.isoformat()}
                     for e in s.scalars(select(Enrollment).where(Enrollment.student_id == student.id))]
-    return {"code": student.code, "name": student.name, "notify_time": student.notify_time,
-            "telegram_linked": bool(student.telegram_chat_id), "subjects": enrolled}
+    return {"name": student.name, "email": student.email, "notify_time": student.notify_time,
+            "telegram_linked": bool(student.telegram_chat_id), "subjects": enrolled,
+            "needs_profile": not (student.name or "").strip()}
 
 
 def check_questions(subject_code: str, llm, recheck: bool = False) -> dict:

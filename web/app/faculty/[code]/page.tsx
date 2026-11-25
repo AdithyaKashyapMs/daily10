@@ -83,6 +83,8 @@ export default function SubjectTopics() {
                       {n(t, "approved") > 0 && <span className="chip bg-mint-soft">{n(t, "approved")} approved</span>}
                       {n(t, "draft") > 0 && <span className="chip bg-sun-soft">{n(t, "draft")} to review</span>}
                       {n(t, "auto_rejected") > 0 && <span className="chip bg-tomato-soft">{n(t, "auto_rejected")} auto-rejected</span>}
+                      {t.simple_status === "approved" && <span className="chip bg-sky-soft">🧩 simple ✓</span>}
+                      {t.simple_status === "draft" && <span className="chip bg-sun-soft">🧩 simple to review</span>}
                       {!Object.keys(t.questions).length && <span className="text-sm text-ink-soft">not generated</span>}
                     </td>
                   </tr>

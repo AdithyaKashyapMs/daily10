@@ -28,6 +28,26 @@ spaced-repetition reviews and a related past-paper question.
 - *Spaced repetition*: Leitner boxes (1, 2, 4, 8, 16, 32 days); a wrong answer comes back tomorrow.
 - *Reminders*: Telegram at each student's chosen time. *Progress*: coverage, streak, accuracy, weak topics.
 
+## Different students, different starting points
+
+Not every student follows the technical terms on the first read, and most won't open a chat to
+ask. So the help is built into the session:
+
+- **Explain simply.** Every topic card has a second tab: the same idea in everyday words, an
+  analogy, and the topic's jargon defined ("Words to know"). It's generated once per topic,
+  glossary terms must appear in the notes, and faculty review it like questions (an analogy can
+  be subtly wrong). Students see it only once it's approved.
+- **Wrong answer → simpler explanation.** A wrong answer shows the simple explanation and the
+  glossary terms that question used.
+- **A question ladder.** Questions are tagged warm-up (what a term means), core (why/how) or
+  exam (apply it, past-paper style). A session's new questions climb that ladder, easiest first.
+- **Adapts from answers, not labels.** Students who consistently get things right (≥85% over
+  6+ answers in a subject) skip the warm-up; students below 60% get the card opened on the simple
+  tab. Nobody is tagged "weak", and everyone works up to exam-style questions.
+
+Topics generated before this existed get the simple layer (and their questions' levels) from
+the next **Generate** run, one LLM call per topic.
+
 ## Question quality
 
 `python -m evals.question_quality judge CC701` on the demo subject (53 questions over 10 topics,
@@ -62,6 +82,9 @@ uvicorn daily10.main:app --port 8000      # API
 cd web && npm install && npm run dev      # web app on http://localhost:3000
 ```
 
+Students sign up and log in with their college email and a password. Locally, without
+`SMTP_HOST`, password-reset links are printed in the API's terminal instead of emailed.
+
 Set up a subject from the terminal (or the faculty pages in the web app):
 
 ```bash
@@ -73,15 +96,149 @@ python -m daily10.cli check CC701                   # independent AI check of dr
 python -m daily10.cli review CC701                  # approve / reject
 ```
 
-Reminders: create a bot with @BotFather, set `TELEGRAM_BOT_TOKEN`, run
-`python -m daily10.notify listen` (students link with `/start <code>`) and `run-due` every few minutes.
+Reminders: create a bot with @BotFather, set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME`
+(and `NEXT_PUBLIC_TELEGRAM_BOT` for the web app), and run `python -m daily10.notify serve`.
+Students tap "Turn on Telegram reminders" on the Me tab, which opens the bot with a single-use
+link code. Reminders go out at each student's chosen time in `STUDY_TIMEZONE`.
 
 ## Web app
 
 Next.js in [`web/`](web/), styled like EventSnap (sticker cards, colour blocks, the Snappy
-mascot). Two logins: **students** (mobile-first, installable PWA; a 6-character code) and
-**faculty** (email + password; registering needs the university invite code `STUDY_ADMIN_KEY`;
-scrypt-hashed passwords, expiring tokens stored only as hashes).
+mascot). Two logins:
+- **Students** (mobile-first, installable PWA): college email + password (8+ characters,
+  scrypt-hashed). Only addresses on `STUDY_STUDENT_EMAIL_DOMAINS` are accepted. "Forgot
+  password?" emails a single-use reset link (30 minutes) and signs out other devices. Each device
+  gets its own session (stored only as a hash); "log out on all my devices" revokes them all.
+- **Faculty**: email + password; registering needs the university invite code `STUDY_ADMIN_KEY`;
+  scrypt-hashed passwords, expiring tokens stored only as hashes.
+
+"Today" is computed in the college's timezone (`STUDY_TIMEZONE`, default Asia/Kolkata), not the
+server's, so a UTC cloud server still starts each student's day at local midnight.
+
+## Deploy (HTTPS)
+
+[`docker-compose.yml`](docker-compose.yml) runs Postgres, the API, the web app and
+[Caddy](deploy/Caddyfile), which gets and renews the HTTPS certificate automatically. Only ports
+80/443 are exposed; the API and database stay on the internal network.
+
+1. A server with Docker, and a domain whose DNS A record points at it (ports 80 and 443 open).
+2. `cp .env.production.example .env.production` and fill it in: domain, database password,
+   invite code, Groq key, college email domain, SMTP settings for password-reset emails.
+3. `docker compose --env-file .env.production up -d --build`, then open `https://<your domain>`.
+4. Optional: `--profile telegram` for reminders, `--profile mcp` for the faculty MCP server at
+   `https://<your domain>/mcp` (bearer token: the invite code, or a faculty token from
+   `POST /api/study/faculty/login` with `"return_token": true`).
+
+With `STUDY_ENV=production` (set by the compose file) the API refuses to start without an invite
+code, SMTP, a student email domain and Postgres.
+
+**Sign-in security.** Browser sessions are httpOnly, `Secure`, `SameSite=Lax` cookies (page
+JavaScript never sees a token), and cookie requests that change data must carry an
+`X-Requested-With` header (CSRF). Wrong passwords are limited per account and per IP (students
+and faculty), as are sign-ups and reset emails per IP; limits are stored in the database, so they
+hold across workers. Login errors and "forgot password" replies are the same whether or not the
+email has an account, and an unknown email costs the same scrypt work. Student sessions slide
+forward while used (60 days idle, 1 year at most); faculty sessions last 7 days. Native apps and
+scripts can use Bearer tokens instead (`"return_token": true` at login). Details:
+[`web_session.py`](daily10/web_session.py), [`student_auth.py`](daily10/student_auth.py),
+[`auth.py`](daily10/auth.py), [`ratelimit.py`](daily10/ratelimit.py).
+
+Back up with `docker compose exec db pg_dump -U daily10 daily10 > backup.sql`.
+
+Postgres works locally too: `STUDY_DATABASE_URL=postgresql+psycopg://user:pass@host/db`. Tables
+are created on first start, and columns added since (such as `students.email`) are added to an
+existing database automatically. The tests run against either database:
+`TEST_DATABASE_URL=postgresql+psycopg://... pytest -q tests`.
+
+## The assistant: an agentic chatbot for students and faculty
+
+One agent engine ([`daily10/assistant/`](daily10/assistant/)), two personas, each seeing only its
+own tools: **Study Buddy** (the 💬 Ask tab for students) and **Faculty Copilot** (✨ Copilot
+for faculty). Ask in plain words, and it plans, calls tools, reads the results, and keeps going until
+it can answer.
+
+```mermaid
+flowchart LR
+    U[User message] --> M[Model<br/>native tool calling<br/>Groq fallback chain]
+    M -->|tool calls| V{Validate args<br/>role check}
+    V -->|bad args| M
+    V -->|read| T[Run tool] --> M
+    V -->|changes data| A[Approve / Cancel card] -->|approved| T
+    A -->|declined| M
+    M -->|final answer| C[Citations checked<br/>against retrieved passages] --> U
+    T -.->|review_question / draft_questions| S[Sub-agents<br/>reviewer · writer]
+```
+
+| Study Buddy workflows | Faculty Copilot workflows |
+|---|---|
+| Explain today's topic simply, then a quick question | Review the flagged queue with the **reviewer sub-agent** (a different model family) |
+| Quiz me: cards with A-D buttons; answers feed spaced repetition | Weekly class report: coverage, who's behind, weakest topics, 3 actions |
+| Am I on track? A verdict plus a 7-day catch-up plan | Remedial questions: weakest topic → **writer sub-agent** → reviewer → approve |
+| Exam prep from past papers | Exam coverage check: highly examined topics with few approved questions |
+| Settings: reminder time, add a subject, report a question | Batch approve / reject / edit, generate, AI check, new subject |
+
+What makes it agentic, and safe:
+- **Plan → act → observe.** For multi-step requests it writes a visible checklist (`update_plan`)
+  and ticks it off. Every tool step streams into a timeline ("Searching CC701 notes for 'cron' → 4 passages").
+- **Self-correction.** Invalid tool arguments go back to the model with the error, and it fixes them.
+  At most 8 model calls per turn; if it runs out, it summarises and offers to continue.
+- **Human in the loop.** Anything that changes data waits for an Approve / Cancel card, and runs
+  only once approved. Sending a new message instead counts as "no". One change waits at a time.
+- **Grounded answers.** Course content comes only from the notes. `[T12#3]` citations become
+  chips that open the passage, and any citation not actually retrieved is flagged.
+- **No answer leaks.** `quiz_me` never gives the model the answer; only `check_answer`, after the
+  student chooses, reveals it and records the attempt.
+- **Scoped.** Tools act only as the signed-in user. Students search only their own subjects and
+  can't reach faculty tools. Conversations are private to their owner. Rate limit: 60 messages an hour.
+- **Memory.** Conversations are saved and reopen exactly as they looked. The last 40 messages are
+  sent, with older tool results shortened, and interrupted turns are repaired automatically.
+
+API: `POST /study/assistant/chat` (SSE stream), `POST .../conversations/{id}/actions/{action}`
+(approve / decline, SSE), plus list / get / delete conversations and `GET /study/assistant/starters`.
+
+**Tests:** `tests/test_assistant.py` (offline, scripted model) covers planning, retrieval and
+citations, quiz leak-proofing, argument repair, role scoping, approvals (approve, decline, ignore),
+sub-agent hand-off, the step limit, outages, memory repair and the SSE API.
+**Live behaviour eval:** `python -m evals.assistant_eval` runs 11 scenarios against the real model,
+on a temporary copy of the database. It checks *what the agent did*: right tools, approval before
+changes, no answer leaks, verified citations, refusing prompt injection.
+
+## Faculty tools in Claude, Cursor or any MCP client
+
+[`daily10/mcp_server.py`](daily10/mcp_server.py) is an MCP server for the university side.
+In Claude Code it's already set up by [`.mcp.json`](.mcp.json): open the repo and approve
+`daily10-faculty`. Elsewhere, run `.venv/bin/python -m daily10.mcp_server` (stdio).
+
+| Kind | Tools |
+|---|---|
+| Data | `list_subjects`, `subject_overview` (topics, exam weight, review queue), `list_questions`, `get_question`, `class_insights` (coverage, students behind or inactive, weakest topics, hardest questions) |
+| Retrieval | `search_notes`, `read_topic`, `search_past_papers`: the client's model searches, reads around hits and cites passage ids like `T12#3` |
+| Agents | `ask_notes`, `review_question`, `draft_questions`: this server's researcher, reviewer and writer sub-agents |
+| Actions | `set_question_status`, `edit_question`, `create_subject`, `add_notes`, `add_past_paper`, `generate_questions`, `run_ai_check` |
+
+Prompts: `review_queue` (go through flagged questions together) and `class_report` (weekly summary).
+
+**Agents.** One agent runtime, several agents. The in-app Faculty Copilot is an orchestrator: it
+hands work to specialist sub-agents ([`subagents.py`](daily10/assistant/subagents.py)): a
+researcher, a reviewer and a writer. Each is a small spec (instructions, allowed tools, model,
+typed output) on the same tools, native tool calling, argument validation and citation checks as
+the chat assistant. A sub-agent works in steps: search the notes, read around good hits, rephrase
+weak searches, check past papers, then submit its result. It can only cite passages it actually
+retrieved; other citations are dropped and reported. `review_question`
+uses a different model family from the one that wrote the questions and searches the whole
+subject, not just the question's topic. Its suggested edits, and every question `draft_questions`
+writes, must quote the notes word for word, or they're discarded / auto-rejected. Agents never
+approve anything: they recommend, and faculty decide. Search is BM25 with CamelCase splitting and
+stemming, so "autoscaling" finds `HorizontalPodAutoscaler`.
+
+Example, on the demo subject: `review_question(48)` found that the marked answer contradicts the
+notes (they fix `60 * * * *` as `0 * * * *`) and proposed a corrected question with a verified quote.
+
+**Access.** Over stdio it runs as the local user, like the CLI, and can read note files under
+your home folder. Over HTTP (`--transport streamable-http --port 8765`), every request needs
+`Authorization: Bearer <faculty login token or STUDY_ADMIN_KEY>`, and file uploads are off
+unless `DAILY10_MCP_FILE_ROOTS` names the allowed folders. Changes record who made them.
+Student login codes are never returned.
 
 ## Project layout
 
@@ -93,19 +250,29 @@ daily10/
   quality.py     automatic checks + independent blind AI check
   scheduler.py   coverage plan + Leitner spaced repetition (pure functions)
   service.py     operations used by the API, CLI and notifier
-  auth.py        faculty accounts and tokens
+  auth.py        faculty accounts and tokens       student_auth.py  student email sign-in, device sessions
+  web_session.py cookie sessions, CSRF, Bearer     ratelimit.py     DB-backed sign-in rate limits
+  mailer.py      password-reset emails (SMTP)
   api.py         FastAPI routes under /study       main.py  the app
   notify.py      Telegram reminders                cli.py   faculty/admin setup
+  mcp_server.py  faculty MCP tools
+  assistant/     agents: chat engine (orchestrator), sub-agents (researcher / reviewer / writer),
+                 tools per role, citation checks, prompts, store
+  assistant_api.py  /study/assistant (SSE)
+  retrieval.py   passage search                    insights.py  overview + class analytics
   llm.py, loaders.py, textproc.py, config.py
 evals/question_quality.py   question-quality eval (judge, human labels, report)
+evals/assistant_eval.py     live agent-behaviour scenarios
 web/                        Next.js app
-tests/                      pytest (offline: fake LLM, in-memory DB)
+tests/                      pytest (offline: fake LLM, in-memory DB or Postgres)
+Dockerfile, web/Dockerfile, docker-compose.yml, deploy/Caddyfile   production deployment
 ```
 
 ## Status
 
-Built and tested; not yet piloted with real students. Next: a real subject's notes, a pilot with
-one class, college email sign-in, deployment with HTTPS.
+Built and tested, including the full production stack (HTTPS, Postgres, password-reset emails)
+run end to end; not yet piloted with real students. Next: a real subject's notes and a pilot
+with one class.
 
 Daily 10 started inside [Enterprise-RAG](https://github.com/AdithyaKashyapMs/Enterprise-RAG) and
 reuses its ideas (chunking, BM25, JSON-mode LLM calls with a model fallback chain).

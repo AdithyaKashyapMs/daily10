@@ -72,7 +72,7 @@ export default function UploadPage() {
           <button
             disabled={!me || !notes.length || !!busy}
             onClick={() => run("notes", async () => {
-              const r = await api.uploadNotes(me!.token, code, notes);
+              const r = await api.uploadNotes(code, notes);
               setNotes([]);
               return `Added ${r.topics_added} daily topics.`;
             })}
@@ -92,7 +92,7 @@ export default function UploadPage() {
           <button
             disabled={!me || !paper || !!busy}
             onClick={() => run("paper", async () => {
-              const r = await api.uploadPaper(me!.token, code, paper!, year ? Number(year) : undefined);
+              const r = await api.uploadPaper(code, paper!, year ? Number(year) : undefined);
               setPaper(null);
               return `Found ${r.questions_found} questions and matched them to topics.`;
             })}
@@ -121,7 +121,7 @@ export default function UploadPage() {
             <button
               disabled={!me || !!busy}
               onClick={() => run("generate", async () => {
-                const s = await api.generate(me!.token, code, limit);
+                const s = await api.generate(code, limit);
                 setStats(s);
                 return s.topics ? `Done: ${s.topics} topics, ${s.draft} questions ready for review.` : "Every topic already has questions.";
               })}
@@ -133,7 +133,7 @@ export default function UploadPage() {
           <button
             disabled={!me || !!busy}
             onClick={() => run("generate", async () => {
-              const c = await api.check(me!.token, code);
+              const c = await api.check(code);
               return c.checked ? `AI check: ${c.passed} passed, ${c.flagged} flagged for a closer look${c.errors ? `, ${c.errors} couldn't be checked` : ""}.` : "No unchecked drafts.";
             })}
             className="btn btn-white self-start"
@@ -145,6 +145,12 @@ export default function UploadPage() {
             <div className="flex flex-wrap gap-2">
               <span className="chip bg-sun-soft">{stats.draft} to review</span>
               <span className="chip bg-tomato-soft">{stats.auto_rejected} auto-rejected</span>
+              {stats.simple_explanations > 0 && (
+                <span className="chip bg-sky-soft">{stats.simple_explanations} simple explanations to review</span>
+              )}
+              {stats.levels_tagged > 0 && (
+                <span className="chip bg-mint-soft">{stats.levels_tagged} questions tagged warm-up / core / exam</span>
+              )}
               {stats.failed_topics > 0 && <span className="chip bg-tomato-soft">{stats.failed_topics} topics failed (try again)</span>}
             </div>
           )}

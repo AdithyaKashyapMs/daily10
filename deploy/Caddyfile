@@ -1,0 +1,22 @@
+# Caddy gets and renews the HTTPS certificate for $DOMAIN automatically (Let's Encrypt).
+# The domain's DNS A record must point at this server, and ports 80 and 443 must be open.
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Faculty MCP server (only if started with --profile mcp). It checks its own bearer tokens.
+	handle /mcp* {
+		reverse_proxy mcp:8765
+	}
+
+	# Everything else is the web app, which proxies /api/* to the backend inside the network.
+	handle {
+		reverse_proxy web:3000
+	}
+}

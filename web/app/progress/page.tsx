@@ -2,24 +2,24 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, type Progress } from "@/lib/api";
-import { useStudentCode } from "@/lib/session";
+import { useStudent } from "@/lib/session";
 import { Loading, StudentFrame } from "@/components/BottomNav";
 import Snappy from "@/components/Snappy";
 
 export default function ProgressPage() {
-  const code = useStudentCode();
+  const ready = useStudent();
   const [data, setData] = useState<Progress | null>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    if (!code) return;
+    if (!ready) return;
     setError("");
     try {
-      setData(await api.progress(code));
+      setData(await api.progress());
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [code]);
+  }, [ready]);
 
   useEffect(() => {
     load();

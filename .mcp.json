@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "daily10-faculty": {
+      "command": ".venv/bin/python",
+      "args": ["-m", "daily10.mcp_server"]
+    }
+  }
+}

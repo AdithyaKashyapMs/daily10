@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Snappy, { type SnappyPose } from "@/components/Snappy";
-import { getCode, getFaculty } from "@/lib/session";
+import { getFaculty, isStudent } from "@/lib/session";
 
 const SCENES: { pose: SnappyPose; block: string; step: string; title: string; text: string }[] = [
   {
@@ -56,7 +56,7 @@ export default function HomePage() {
   useEffect(() => {
     // Signed-in users go straight to their own home.
     if (getFaculty()) router.replace("/faculty");
-    else if (getCode()) router.replace("/today");
+    else if (isStudent()) router.replace("/today");
   }, [router]);
 
   return (

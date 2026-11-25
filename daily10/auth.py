@@ -5,6 +5,10 @@ Passwords are hashed with scrypt (Python standard library, memory-hard) and a ra
 Login returns a random token; the database stores only its SHA-256, and tokens expire after
 TOKEN_DAYS. Registering needs the university's invite code (STUDY_ADMIN_KEY), so only staff
 the university gives the code to can create faculty accounts.
+
+Password guessing is limited: FAILS_PER_EMAIL wrong passwords per account and FAILS_PER_IP per
+client IP per WINDOW_MINUTES; a successful login resets the account's count. An unknown email
+costs the same scrypt work as a known one, so timing doesn't reveal who has an account.
 """
 
 import hashlib
@@ -15,11 +19,16 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import delete, func, select
 
-from daily10 import db
+from daily10 import db, ratelimit
 from daily10.db import Faculty, FacultyToken
 
 TOKEN_DAYS = 7
+MIN_PASSWORD = 10
+FAILS_PER_EMAIL = 5
+FAILS_PER_IP = 30
+WINDOW_MINUTES = 15
 _SCRYPT = dict(n=2**14, r=8, p=1, dklen=32)
+_DUMMY_HASH = None
 
 
 class AuthError(PermissionError):
@@ -58,8 +67,8 @@ def register(name: str, email: str, password: str, invite: str | None, departmen
     expected = invite_code()
     if expected and not hmac.compare_digest(invite or "", expected):
         raise AuthError("Wrong university invite code.")
-    if len(password) < 8:
-        raise ValueError("Password must be at least 8 characters.")
+    if len(password) < MIN_PASSWORD:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD} characters.")
     email = email.strip().lower()
     with db.session() as s:
         if s.scalar(select(Faculty).where(Faculty.email == email)):
@@ -70,12 +79,24 @@ def register(name: str, email: str, password: str, invite: str | None, departmen
         return f
 
 
-def login(email: str, password: str) -> tuple[str, Faculty]:
+def login(email: str, password: str, ip: str | None = None) -> tuple[str, Faculty]:
+    global _DUMMY_HASH
+    email = email.strip().lower()
+    ratelimit.check(f"faculty-login:{email}", FAILS_PER_EMAIL, WINDOW_MINUTES)
+    if ip:
+        ratelimit.check(f"faculty-login-ip:{ip}", FAILS_PER_IP, WINDOW_MINUTES)
     with db.session() as s:
-        f = s.scalar(select(Faculty).where(Faculty.email == email.strip().lower()))
+        f = s.scalar(select(Faculty).where(Faculty.email == email))
+        if f is None:
+            _DUMMY_HASH = _DUMMY_HASH or hash_password(secrets.token_hex(8))
+            verify_password(password, _DUMMY_HASH)          # same work as a real check
         # Same error either way, so the response doesn't reveal which emails have accounts.
         if f is None or not verify_password(password, f.password_hash):
+            ratelimit.record(f"faculty-login:{email}")
+            if ip:
+                ratelimit.record(f"faculty-login-ip:{ip}")
             raise AuthError("Wrong email or password.")
+        ratelimit.clear(f"faculty-login:{email}")
         token = secrets.token_urlsafe(32)
         now = datetime.now(timezone.utc)
         s.execute(delete(FacultyToken).where(FacultyToken.faculty_id == f.id, FacultyToken.expires_at < now))

@@ -7,11 +7,12 @@ export default function FacultyShell({ subject, children }: { subject?: string; 
   const links = subject
     ? [
         { href: "/faculty", label: "All subjects" },
+        { href: "/faculty/assistant", label: "✨ Copilot" },
         { href: `/faculty/${subject}`, label: "Topics" },
         { href: `/faculty/${subject}/upload`, label: "Upload & generate" },
         { href: `/faculty/${subject}/review`, label: "Review questions" },
       ]
-    : [{ href: "/faculty", label: "All subjects" }];
+    : [{ href: "/faculty", label: "All subjects" }, { href: "/faculty/assistant", label: "✨ Copilot" }];
   return (
     <div className="flex min-h-[calc(100dvh-60px)] flex-col md:flex-row">
       <Sidebar links={links} />

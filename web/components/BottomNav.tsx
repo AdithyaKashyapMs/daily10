@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TABS = [
   { href: "/today", label: "Today", emoji: "📖" },
+  { href: "/assistant", label: "Ask", emoji: "💬" },
   { href: "/progress", label: "Progress", emoji: "🔥" },
   { href: "/settings", label: "Me", emoji: "🙂" },
 ];
@@ -14,12 +15,12 @@ export function BottomNav() {
   const path = usePathname();
   return (
     <nav className="safe-bottom sticky bottom-0 z-30 border-t-[2.5px] border-ink bg-white px-3 pt-2.5">
-      <ul className="mx-auto grid max-w-md grid-cols-3 gap-2">
+      <ul className="mx-auto grid max-w-md grid-cols-4 gap-1.5">
         {TABS.map((t) => {
           const active = path?.startsWith(t.href);
           return (
             <li key={t.href}>
-              <Link href={t.href} aria-current={active ? "page" : undefined} className={`btn btn-sm btn-block ${active ? "btn-primary" : "btn-white"}`}>
+              <Link href={t.href} aria-current={active ? "page" : undefined} className={`btn btn-sm btn-block !px-1 ${active ? "btn-primary" : "btn-white"}`}>
                 <span aria-hidden>{t.emoji}</span> {t.label}
               </Link>
             </li>

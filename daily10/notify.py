@@ -1,11 +1,12 @@
 """
 Telegram reminders: one message a day per student, at the time they chose.
 
-Setup: create a bot with @BotFather, set TELEGRAM_BOT_TOKEN, run `listen` so students can
-link their account by sending "/start <student code>" to the bot, and run `run-due` every
-few minutes (cron, or Celery beat in production):
+Setup: create a bot with @BotFather, set TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME, and run
 
-    */5 * * * *  cd /path/to/Marathon && .venv/bin/python -m app.study.notify run-due
+    python -m daily10.notify serve        # answers the bot and sends reminders every minute
+
+(or `listen` and `run-due` separately, e.g. run-due from cron). Students link their chat from the
+app's Me tab, which opens t.me/<bot>?start=<single-use code>.
 
 Times are in STUDY_TIMEZONE (default Asia/Kolkata). A student is reminded at most once a day.
 """
@@ -13,13 +14,13 @@ Times are in STUDY_TIMEZONE (default Asia/Kolkata). A student is reminded at mos
 import argparse
 import os
 import time
+import threading
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 import logging
 import requests
 
-from daily10 import service
+from daily10 import config, service, student_auth
 
 log = logging.getLogger(__name__)
 
@@ -59,14 +60,14 @@ def reminder_text(name: str, preview: dict, app_url: str) -> str:
 
 
 def now_local() -> datetime:
-    return datetime.now(ZoneInfo(os.getenv("STUDY_TIMEZONE", "Asia/Kolkata")))
+    return config.local_now()
 
 
 def run_due(now: datetime | None = None, sender=send) -> int:
     """Send today's reminder to every student whose time has come. Returns messages sent."""
     now = now or now_local()
     today, hhmm = now.date(), now.strftime("%H:%M")
-    app_url = os.getenv("STUDY_APP_URL", "http://localhost:8501/Daily_10")
+    app_url = config.app_url()
     sent = 0
     for student in service.students_to_notify(hhmm, today):
         text = reminder_text(student.name, service.preview_today(student.code, today), app_url)
@@ -81,26 +82,30 @@ def run_due(now: datetime | None = None, sender=send) -> int:
 
 
 def handle_message(chat_id: str, text: str) -> str:
-    """Bot replies: /start CODE links the chat to a student; /today shows today's plan."""
+    """Bot replies: /start <link code> links the chat to a student; /today shows today's plan."""
     words = text.strip().split()
     if not words:
         return ""
     if words[0] == "/start":
         if len(words) < 2:
-            return "Send /start followed by your student code from the Daily 10 app, e.g. /start A1B2C3"
-        try:
-            student = service.get_student(words[1])
-        except service.NotFound:
-            return "I don't recognise that code. Check it in the Daily 10 app."
+            return "Open the Daily 10 app, go to Me, and tap \"Turn on Telegram reminders\" to link this chat."
+        student = student_auth.redeem_telegram_code(words[1])
+        if student is None:
+            return "That link has expired. Open the Daily 10 app (Me tab) and tap the Telegram button again."
         service.set_preferences(student.code, telegram_chat_id=str(chat_id))
         return f"Linked! I'll remind you daily at {student.notify_time}. Send /today to see today's plan."
     if words[0] == "/today":
         student = service.student_by_chat(str(chat_id))
         if student is None:
-            return "Link your account first: /start <your student code>"
-        text = reminder_text(student.name, service.preview_today(student.code), os.getenv("STUDY_APP_URL", ""))
+            return "Link your account first: open the Daily 10 app, Me tab, Telegram button."
+        text = reminder_text(student.name, service.preview_today(student.code, config.local_today()), config.app_url())
         return text or "Nothing left for today. Nice work! ✅"
-    return "Commands: /start <code>, /today"
+    if words[0] == "/stop":
+        student = service.student_by_chat(str(chat_id))
+        if student:
+            service.set_preferences(student.code, telegram_chat_id="")
+        return "Reminders are off. Link again from the app any time."
+    return "Commands: /today, /stop"
 
 
 def listen(poll_seconds: int = 30) -> None:
@@ -119,13 +124,30 @@ def listen(poll_seconds: int = 30) -> None:
             time.sleep(1)
 
 
+def serve(every_seconds: int = 60) -> None:
+    """Answer the bot and send due reminders, in one process (what the Docker worker runs)."""
+    threading.Thread(target=listen, daemon=True, name="telegram-listen").start()
+    while True:
+        try:
+            sent = run_due()
+            if sent:
+                log.info(f"Sent {sent} reminder(s)")
+        except Exception as e:
+            log.warning(f"Reminder run failed: {e}")
+        time.sleep(every_seconds)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="Daily 10 Telegram reminders")
-    parser.add_argument("command", choices=["run-due", "listen"])
+    parser.add_argument("command", choices=["run-due", "listen", "serve"])
     args = parser.parse_args()
+    _token()  # fail fast without TELEGRAM_BOT_TOKEN
     if args.command == "run-due":
         print(f"Sent {run_due()} reminder(s).")
-    else:
-        print("Listening for /start messages (Ctrl+C to stop)...")
+    elif args.command == "listen":
+        print("Listening for bot messages (Ctrl+C to stop)...")
         listen()
+    else:
+        print("Answering the bot and sending reminders every minute (Ctrl+C to stop)...")
+        serve()

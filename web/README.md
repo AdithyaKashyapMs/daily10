@@ -4,12 +4,19 @@ Same look as EventSnap (the AI Event Photo Discovery Platform): sticker cards an
 flat colour blocks, Baloo 2 + Nunito, and the Snappy mascot with study poses.
 
 **Two logins**
-- **Students** (`/auth/student`): sign up with a name and reminder time, or log in with their
-  6-character code. Mobile-first and installable (PWA): open in the phone browser and tap
-  **Add to Home Screen**.
-- **Faculty / university** (`/auth/faculty`): email + password accounts. Creating one needs
-  the university invite code (`STUDY_ADMIN_KEY` on the server); passwords are scrypt-hashed and
-  logins are expiring tokens.
+- **Students** (`/auth/student`): college email + password, with **Log in / Create account**
+  tabs, a Show/Hide password toggle and "Forgot password?" (emails a reset link that opens
+  `/auth/reset`). Password can be changed on the Me tab. Each device gets its own session, kept
+  alive while the app is used;
+  "Log out on all my devices" is on the Me tab. Mobile-first and installable (PWA): open in the
+  phone browser and tap **Add to Home Screen** (needs HTTPS when deployed).
+- **Faculty / university** (`/auth/faculty`): email + password accounts (10+ characters).
+  Creating one needs the university invite code (`STUDY_ADMIN_KEY` on the server).
+
+**Sessions are httpOnly cookies** set by the API: page JavaScript never sees a login token, so an
+XSS bug can't steal one. [`middleware.ts`](middleware.ts) redirects signed-out users before a
+protected page renders; [`lib/api.ts`](lib/api.ts) sends the CSRF header the API requires and
+sends the user to log in on a 401. `localStorage` holds only non-secret UI hints.
 
 **Student screens:** Today (concept card → one question at a time with instant feedback and
 the quote from the notes → past exam question), Progress (streak, accuracy, syllabus covered,
